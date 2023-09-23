@@ -42,8 +42,8 @@ ATTR_CONIN      equ     00001h
 ; Device name and attributes. Modify according to your needs
 ;
 
-DEVICE_NAME     equ     'MYDEVIC$'
-DEVICE_ATTR     equ     ATTR_CHAR or ATTR_EXCALLS
+DEVICE_NAME     equ     'PARAPSD$'
+DEVICE_ATTR     equ     ATTR_EXCALLS
 
 ; End of user modifiable part
 

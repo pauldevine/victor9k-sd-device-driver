@@ -25,6 +25,7 @@
 
 #include "devinit.h"
 #include "template.h"
+#include "cprint.h"
 
 #pragma data_seg("_CODE")
 
@@ -32,6 +33,8 @@
 // Place here any variables or constants that should go away after initialization
 //
 static char hellomsg[] = "\r\nDOS Device Driver Template in Open Watcom C\r\n$";
+static char test_message[] = "Test message\n";
+
 
 uint16_t DeviceInit( void )
 {
@@ -39,5 +42,6 @@ uint16_t DeviceInit( void )
 
     fpRequest->r_endaddr = MK_FP(getCS(), &transient_data);
 
+    cdprintf(test_message);
     return 0;
 }

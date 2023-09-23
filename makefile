@@ -29,7 +29,7 @@ CFLAGS  = -0 -bt=dos -ms -q -s -osh
 ASFLAGS = -bt=DOS -zq -mt -0
 LDFLAGS =	SYSTEM dos &
 			ORDER clname HEADER clname DATA clname CODE clname BSS clname INIT &
-			DISABLE 1014 OPTION QUIET, STATICS, MAP=template.map
+			DISABLE 1014 OPTION QUIET, STATICS, MAP=parap-sd.map
 
 !ifdef USE_INTERNAL_STACK
 CFLAGS += -DUSE_INTERNAL_STACK -DSTACK_SIZE=300
@@ -37,9 +37,9 @@ CFLAGS += -DUSE_INTERNAL_STACK -DSTACK_SIZE=300
 CFLAGS += -zu
 !endif
 
-TARGET = template.sys
+TARGET = parapsd.sys
 
-OBJ =	cstrtsys.obj devinit.obj template.obj
+OBJ =	cstrtsys.obj devinit.obj template.obj cprint.obj
 
 all : $(TARGET)
 
