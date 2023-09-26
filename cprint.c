@@ -213,28 +213,46 @@ void cdprintf (char near *msg, ...)
   va_start (ap, msg);
 
   while (*msg != '\0') {
-/*outhex((unsigned) msg, 4);  outchr('=');  outhex(*msg, 2);  outchr(' ');*/
+    //outhex((unsigned) msg, 4);  outchr('=');  outhex(*msg, 2);  outchr(' ');
     if (*msg == '%') {
-      ++msg;  size = 0;
-      if ((*msg >= '0')  &&  (*msg <= '9'))
-   {size = *msg - '0';  ++msg;}
-      if (*msg == 'c') {
-        ival = va_arg(ap, int);  outchr(ival&0xff);  ++msg;
-      } else if (*msg == 'd') {
-   ival = va_arg(ap, int);  outdec (ival);   ++msg;
-      } else if (*msg == 'x') {
-   uval = va_arg(ap, unsigned); ++msg;
+      ++msg;  
+      size = 0;
+      if ((*msg >= '0')  &&  (*msg <= '9')) 
+      {
+        size = *msg - '0';  
+        ++msg;
+      }
+      if (*msg == 'c') 
+      {
+        ival = va_arg(ap, int);  
+        outchr(ival&0xff);  
+        ++msg;
+      } else if (*msg == 'd') 
+      {
+        ival = va_arg(ap, int);  
+        outdec (ival);
+        ++msg;
+      } else if (*msg == 'x') 
+      {
+        uval = va_arg(ap, unsigned); 
+        ++msg;
         outhex (uval,  (size > 0) ? size : 4);
-      } else if (*msg == 'L') {
-   luval = va_arg(ap, uint16_t); ++msg;
+      } else if (*msg == 'L') 
+      {
+        luval = va_arg(ap, uint16_t); 
+        ++msg;
         outlhex (luval);
       } else if (*msg == 's') {
-        str = va_arg(ap, char *);  outstr (str);  ++msg;
+        str = va_arg(ap, char *);  
+        outstr (str);  
+        ++msg;
       }
     } else if (*msg == '\n') {
-      newline();  ++msg;
+      newline();  
+      ++msg;
     } else {
-      outchr(*msg);  ++msg;
+      outchr(*msg);  
+      ++msg;
     }
   }
 

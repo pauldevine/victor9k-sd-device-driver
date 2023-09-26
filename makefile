@@ -19,7 +19,7 @@
 # MA  02110-1301, USA.
 #
 
-#!define USE_INTERNAL_STACK
+!define USE_INTERNAL_STACK
 
 CC = wcc
 AS = wasm

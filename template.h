@@ -42,11 +42,19 @@
 #define pop_segregs "pop es" "pop ds"
 #endif
 
+#ifndef ALL_REGS
+struct ALL_REGS {
+    uint16_t cs, ds, es, ss;  // Segment registers
+    uint16_t ax, bx, cx, dx;  // General-purpose registers
+};
+#endif
+
 #ifdef USE_INTERNAL_STACK
 
 #ifndef STACK_SIZE
 #define STACK_SIZE 300
 #endif
+
 
 extern uint8_t *stack_bottom;
 extern uint32_t dos_stack;
@@ -86,6 +94,40 @@ extern void pop_regs( void );
 extern __segment getCS( void );
 #pragma aux getCS = \
     "mov ax, cs";
+
+extern void get_segments(struct SREGS far *sregs);
+#pragma aux get_segments = \
+    "mov ax, cs" \
+    "mov [si], ax" \
+    "mov ax, ds" \
+    "mov [si+2], ax" \
+    "mov ax, es" \
+    "mov [si+4], ax" \
+    "mov ax, ss" \
+    "mov [si+6], ax" \
+    parm [si] \
+    modify [ax];
+
+extern void get_all_registers(struct ALL_REGS far *all_regs);
+#pragma aux get_all_registers = \
+    "mov ax, cs" \
+    "mov [si], ax" \
+    "mov ax, ds" \
+    "mov [si+2], ax" \
+    "mov ax, es" \
+    "mov [si+4], ax" \
+    "mov ax, ss" \
+    "mov [si+6], ax" \
+    "mov ax, ax" \
+    "mov [si+8], ax" \
+    "mov ax, bx" \
+    "mov [si+10], ax" \
+    "mov ax, cx" \
+    "mov [si+12], ax" \
+    "mov ax, dx" \
+    "mov [si+14], ax" \
+    parm [si] \
+    modify [ax];
 
 extern void printMsg( const char * );
 #pragma aux printMsg =        \

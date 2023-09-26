@@ -48,6 +48,7 @@
 #define _DEVICE_H_
 
 #include <stdint.h>
+#include <stdbool.h>
 
 /*
  *      Status Word Bits
@@ -509,6 +510,8 @@ typedef int8_t __far *byteptr;
 typedef struct dhdr __far *dhdrptr;
 
 #pragma pack( pop )
+
+static bool parse_options (char far *);
 
 #endif /* _DEVICE_H_ */
 /*
