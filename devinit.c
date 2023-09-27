@@ -53,7 +53,8 @@
 
 #include "devinit.h"
 #include "template.h"
-#include "cprint.h"
+#include "cprint.h"     /* Console printing direct to hardware */
+#include "sd.h"         /* SD card glue */
 
 #pragma data_seg("_CODE")
 bool Debug = TRUE;
@@ -91,7 +92,7 @@ uint16_t DeviceInit( void )
     uint16_t offset;
     uint16_t brkadr, reboot[2];  
     void (__interrupt far *reboot_address)();  /* Reboot vector */
-    uint16_t far *bpb_pointer;
+    bpb far *bpb_pointer;
 
     get_all_registers(&registers);
 
@@ -102,8 +103,9 @@ uint16_t DeviceInit( void )
     cdprintf("     based on TU58 by Robert Armstrong\n");
 
     //address to find passed by DOS in a combo of ES / BX registers
+    
     cdprintf("about to parse bpb, ES: %x BX: %x\n", registers.es, registers.bx);
-    bpb_pointer = MK_FP(registers.es, registers.bx);
+    bpb_pointer = *(fpRequest->r_bpbptr);
     cdprintf("gathered bpb_pointer: %x\n", bpb_pointer);
     /* Parse the options from the CONFIG.SYS file, if any... */
     if (!parse_options((char far *) bpb_pointer)) {
@@ -112,22 +114,13 @@ uint16_t DeviceInit( void )
     }
     cdprintf("done parsing bpb_pointer: %x\n", bpb_pointer);
 
-    // /* Try to make contact with the drive... */
-    // if (Debug) cdprintf("SD: initializing drive\n");
-    // if (!SDInitialize(rh->rh.unit, partition_number, &bpb)) {
-    //     cdprintf("SD: drive not connected or not powered\n");
-    //     goto unload1;
-    // }
-    // cdprintf("SD: rh = %4x:%4x\n", FP_SEG(rh), FP_OFF(rh));
-    // reboot_address = (void (__interrupt far *)()) MK_FP(segment, offset);
-
-    // /* Save the old reboot vector and install ours... */
-    // RebootVector = _dos_getvect(0x19);
-    // _dos_setvect(0x19, (void (__interrupt far *)()) reboot_address);
-
-    // if (Debug)
-    //     cdprintf("SD: reboot vector = %4x:%4x, old vector = %4x, %4x\n",
-    //         reboot_address[1], reboot_address[0], RebootVector[1], RebootVector[0]);
+    /* Try to make contact with the drive... */
+    if (Debug) cdprintf("SD: initializing drive\n");
+    if (!sd_initialize(fpRequest->r_unit, partition_number, bpb_pointer)) {
+        cdprintf("SD: drive not connected or not powered\n");
+        goto unload1;
+    }
+    cdprintf("SD: rh = %4x:%4x\n", FP_SEG(bpb_pointer), FP_OFF(bpb_pointer));
 
     // /* All is well.  Tell DOS how many units and the BPBs... */
     // cdprintf("SD initialized on DOS drive %c\n",
