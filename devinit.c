@@ -92,20 +92,25 @@ uint16_t DeviceInit( void )
     uint16_t offset;
     uint16_t brkadr, reboot[2];  
     void (__interrupt far *reboot_address)();  /* Reboot vector */
-    bpb far *bpb_pointer;
+    uint8_t far *bpb_pointer;
 
     get_all_registers(&registers);
 
     fpRequest->r_endaddr = MK_FP(registers.cs, &transient_data);
 
-    cdprintf("\nSD pport device driver V0.1 (C) 2023 by Paul Devine\n");
-    cdprintf("     based on (C) 2014 by Dan Marks\n");
-    cdprintf("     based on TU58 by Robert Armstrong\n");
+    cdprintf("\nSD pport device driver v0.1 (C) 2023 by Paul Devine\n");
+    cdprintf("     based on (C) 2014 by Dan Marks");
+    cdprintf(" and on TU58 by Robert Armstrong\n");
+    cdprintf(".    with help from an openwatcom driver by Eduardo Casino\n");
 
     //address to find passed by DOS in a combo of ES / BX registers
     
     cdprintf("about to parse bpb, ES: %x BX: %x\n", registers.es, registers.bx);
-    bpb_pointer = *(fpRequest->r_bpbptr);
+
+    //DOS is overloading a data structure that in normal use stores the BPB, 
+    //for init() it stores the string that sits in config.sys
+    //hence I'm casting to a char
+    bpb_pointer = (uint8_t __far *)(fpRequest->r_bpbptr);  
     cdprintf("gathered bpb_pointer: %x\n", bpb_pointer);
     /* Parse the options from the CONFIG.SYS file, if any... */
     if (!parse_options((char far *) bpb_pointer)) {
@@ -116,7 +121,7 @@ uint16_t DeviceInit( void )
 
     /* Try to make contact with the drive... */
     if (Debug) cdprintf("SD: initializing drive\n");
-    if (!sd_initialize(fpRequest->r_unit, partition_number, bpb_pointer)) {
+    if (!sd_initialize(fpRequest->r_unit, partition_number, fpRequest->r_bpbptr)) {
         cdprintf("SD: drive not connected or not powered\n");
         goto unload1;
     }
@@ -224,7 +229,12 @@ bool parse_options (char far *p)
             cdprintf("SD: Invalid port base index %x\n",temp);
         else
             portbase = temp;
-            cdprintf("SD: port base index %x\n",portbase);
+            if (portbase = 1)
+            {
+                cdprintf("SD: using parallel port %x\n",portbase);
+            } else {
+                cdprintf("SD: using serial port %x\n",portbase);
+            }
         break; 
     default:
         return FALSE;
