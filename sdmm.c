@@ -109,8 +109,8 @@ static volatile uint8_t far *CONTROLPORT;
 
 void par_port_init(void) {
     //Via-1 is main parallel port 
-    cdprintf("Address of via1: %p\n", (void*)via1);    
-    cdprintf("via1->out_in_reg_a\n", (void*)via1);          
+    cdprintf("Address of via1: %x\n", (void*)via1);    
+    cdprintf("via1->out_in_reg_a: %x\n", (void*)via1);          
     via1->out_in_reg_a = 0;               /* out_in_reg_a is dataport, init with 0's =output bits */ 
     cdprintf("data_dir_reg_a\n"); 
     via1->data_dir_reg_a = 0xFF;          /* register a is all outbound, 11111= all bits outgoing */
@@ -690,7 +690,7 @@ DSTATUS disk_initialize (
    uint16_t tmr;
    DSTATUS s;
 
-   //setportbase(portbase);
+   setportbase(portbase);
 
    if (drv) return RES_NOTRDY;
    if ((sd_card_check) && (CDDETECT(STATUSPORT)))
