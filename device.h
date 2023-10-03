@@ -165,11 +165,24 @@ struct dhdr {
 
 /*                                                                      */
 /* Bios Parameter Block structure                                       */
+/* Victor 9000 / Sirius 1 BIOS uses the following for the BPB, it's non-standard  */
 /*                                                                      */
+/* WORD bytes per sector                                                */
+/* BYTE sectors per allocation unit (cluster)                           */
+/* WORD number of reserved sectors                                      */
+/* BYTE number of FATS                                                  */
+/* WORD number of entries in the root directory                         */
+/* WORD number of sectors in logical image of device                    */
+/* BYTE media descriptor                                                */
+/* WORD number of FAT sectors                                           */
+/*                                                                      */
+//realized the above table was written when DOS x2.x was released. I'm going
+//to assume the below table exists in Victor9K DOS 3.1.
 
 #define FAT_NO_MIRRORING 0x80
 
 #define BPB_SIZEOF 31           /* size of the standard BPB */
+
 
 typedef struct {
   uint16_t bpb_nbyte;              /* Bytes per Sector             */
@@ -177,7 +190,7 @@ typedef struct {
   uint16_t bpb_nreserved;          /* # Reserved Sectors           */
   uint8_t bpb_nfat;               /* # FATs                       */
   uint16_t bpb_ndirent;            /* # Root Directory entries     */
-  uint16_t bpb_nsize;              /* Size in sectors              */
+  uint16_t bpb_nsize;              /* Size in sectors              */ 
   uint8_t bpb_mdesc;              /* MEDIA Descriptor Byte        */
   uint16_t bpb_nfsect;             /* FAT size in sectors          */
   uint16_t bpb_nsecs;              /* Sectors per track            */

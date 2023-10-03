@@ -141,8 +141,7 @@ void par_port_init(void) {
 / out_in_reg_b is ctrlport, init no ds/pi 
 / last 2 only are outgoing               
 /-------------------------------------------------------------------------*/ 
-#define VAR_INIT() \
-    par_port_init();
+#define VAR_INIT() par_port_init();
 
 
 /* MISOPIN (SD card DAT0/DO pin 7) is PPORT SELECT (DB-25 pin 13) */
@@ -209,9 +208,10 @@ void setportbase(uint8_t val)
 #define CK_INIT() 
 #define CS_INIT()
 
-const int bit_delay_val = 10;
+const int bit_delay_us = 10;
 
-#define BITDLY()
+#define BITDLY() delay_us(bit_delay_us)
+
 
 #define DO(statusport) (inportbyte((statusport)) & MISOPIN)  
 #define CDDETECT(statusport) (inportbyte((statusport)) & CDDETECTPIN)
@@ -227,14 +227,13 @@ const int bit_delay_val = 10;
 
 #define ADJ_VAL 1
 
-static void dly_us(unsigned int n) 
-{
-    __asm {
-        mov cx, n
-    loopit:
-        loop loopit
-    }
-}
+static void delay_us(unsigned int n);
+#pragma aux delay_us = \
+    "mov cx, ax", \
+    "loopit:", \
+    "loop loopit", \
+    parm [ax] \
+    modify [cx];
 
 #define NOSHIFT
 
@@ -469,7 +468,7 @@ int wait_ready (void)   /* 1:OK, 0:Timeout */
    for (tmr = 5000; tmr; tmr--) {   /* Wait for ready in timeout of 500ms */
       rcvr_mmc(&d, 1);
       if (d == 0xFF) break;
-      dly_us(100);
+      delay_us(100);
    }
 
    return tmr ? 1 : 0;
@@ -528,7 +527,7 @@ int rcvr_datablock ( /* 1:OK, 0:Failed */
    for (tmr = 1000; tmr; tmr--) {   /* Wait for data packet in timeout of 100ms */
       rcvr_mmc(d, 1);
       if (d[0] != 0xFF) break;
-      dly_us(100);
+      delay_us(100);
    }
    if (d[0] != 0xFE) {
     return 0;      /* If not valid data token, return with error */
@@ -682,26 +681,36 @@ DRESULT disk_result (
 /* Initialize Disk Drive                                                 */
 /*-----------------------------------------------------------------------*/
 
-DSTATUS disk_initialize (
-   uint8_t drv    /* Physical drive nmuber (0) */
-)
+DSTATUS disk_initialize (uint8_t drv)
 {
-   uint8_t n, ty, cmd, buf[4];
+   /* drv = Physical drive nmuber (0) */
+   uint8_t n, card_type, cmd, buf[4];
    uint16_t tmr;
    DSTATUS s;
 
+   cdprintf ("disk_initialize: before setportbase(), drv: %x\n", drv);
+   cdprintf ("disk_initialize: before setportbase(), portbase: %x\n", portbase);
    setportbase(portbase);
 
+   cdprintf ("disk_initialize: if (drv) return: %x\n", drv);
    if (drv) return RES_NOTRDY;
-   if ((sd_card_check) && (CDDETECT(STATUSPORT)))
+   
+   cdprintf ("disk_initialize: if sd_card_check: %x CDDETECT(STATUSPORT): %x \n", 
+      sd_card_check, CDDETECT(STATUSPORT));
+   if ((sd_card_check) && (CDDETECT(STATUSPORT))){
       return RES_NOTRDY;
-
-   ty = 0;
+   }
+   
+   card_type = 0;
    for (n = 5; n; n--) {
-      CS_INIT(); CS_H(OUTPORT);   /* Initialize port pin tied to CS */
-      dly_us(10000);       /* 10ms. time for SD card to power up */
-      CS_INIT(); CS_H(OUTPORT);   /* Initialize port pin tied to CS */
-      CK_INIT(); CK_L(OUTPORT);   /* Initialize port pin tied to SCLK */
+      cdprintf ("disk_initialize: for: %x\n", n);
+      CS_INIT(); 
+      CS_H(OUTPORT);   /* Initialize port pin tied to CS */
+      delay_us(10000);       /* 10ms. time for SD card to power up */
+      CS_INIT(); 
+      CS_H(OUTPORT);   /* Initialize port pin tied to CS */
+      CK_INIT(); 
+      CK_L(OUTPORT);   /* Initialize port pin tied to SCLK */
       DI_INIT();           /* Initialize port pin tied to DI */
       DO_INIT();           /* Initialize port pin tied to DO */
       for (tmr = 10; tmr; tmr--) dummy_rcvr_mmc(); /* Apply 80 dummy clocks and the card gets ready to receive command */
@@ -711,33 +720,34 @@ DSTATUS disk_initialize (
             if (buf[2] == 0x01 && buf[3] == 0xAA) {      /* The card can work at vdd range of 2.7-3.6V */
                for (tmr = 1000; tmr; tmr--) {         /* Wait for leaving idle state (ACMD41 with HCS bit) */
                   if (send_cmd(ACMD41, 1UL << 30) == 0) break;
-                  dly_us(1000);
+                  delay_us(1000);
                }
                if (tmr && send_cmd(CMD58, 0) == 0) {  /* Check CCS bit in the OCR */
                   rcvr_mmc(buf, 4);
-                  ty = (buf[0] & 0x40) ? CT_SD2 | CT_BLOCK : CT_SD2; /* SDv2 */
+                  card_type = (buf[0] & 0x40) ? CT_SD2 | CT_BLOCK : CT_SD2; /* SDv2 */
                }
             }
          } else {                   /* SDv1 or MMCv3 */
             if (send_cmd(ACMD41, 0) <= 1)    {
-               ty = CT_SD1; cmd = ACMD41; /* SDv1 */
+               card_type = CT_SD1; cmd = ACMD41; /* SDv1 */
             } else {
-               ty = CT_MMC; cmd = CMD1;   /* MMCv3 */
+               card_type = CT_MMC; cmd = CMD1;   /* MMCv3 */
             }
             for (tmr = 1000; tmr; tmr--) {         /* Wait for leaving idle state */
                if (send_cmd(cmd, 0) == 0) break;
-               dly_us(1000);
+               delay_us(1000);
             }
             if (!tmr || send_cmd(CMD16, 512) != 0) /* Set R/W block length to 512 */
-               ty = 0;
+               card_type = 0;
          }
          break;
       }
    }
-   CardType = ty;
-   s = ty ? 0 : STA_NOINIT;
+   CardType = card_type;
+   cdprintf ("disk_initialize: CardType: %x\n", CardType);
+   s = card_type ? 0 : STA_NOINIT;
    Stat = s;
-
+   cdprintf ("disk_initialize: Stat: %x\n", Stat);
    deselect();
 
    return s;

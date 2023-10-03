@@ -114,11 +114,7 @@ uint8_t check_fs (uint8_t unit,
 /*-----------------------------------------------------------------------*/
 
 static
-int find_volume ( 
-   uint8_t unit,
-   uint8_t partno,
-   bpb far *bpb
-)
+int find_volume (uint8_t unit, uint8_t partno, bpb far *bpb)
 {
    uint8_t fmt;
    DSTATUS stat;
@@ -127,15 +123,20 @@ int find_volume (
 
    stat = disk_status(unit);
    if (!(stat & STA_NOINIT)) {      /* and the physical drive is kept initialized */
+      cdprintf ("find_volume: before disk_initialize() disk_status says stat: %x STA_NOINIT: %x\n", stat, STA_NOINIT);
          return 0;                  /* The file system object is valid */
    }
+   cdprintf ("find_volume: before disk_initialize() disk_status says stat: %x STA_NOINIT: %x\n", stat, STA_NOINIT);
 
    /* The file system object is not valid. */
    /* Following code attempts to mount the volume. (analyze BPB and initialize the fs object) */
 
    stat = disk_initialize(unit);    /* Initialize the physical drive */
-   if (stat & STA_NOINIT)           /* Check if the initialization succeeded */
+   if (stat & STA_NOINIT) {          /* Check if the initialization succeeded */
+      cdprintf("find_volume: after disk_initialize() initialization failed no medium or hard error stat: %x STA_NOINIT: %x\n", stat, STA_NOINIT);
       return -1;                    /* Failed to initialize due to no medium or hard error */
+   }
+   cdprintf ("find_volume: after disk_initialize() disk_status says stat: %x STA_NOINIT: %x\n", stat, STA_NOINIT);
    
    /* Find an FAT partition on the drive. Supports only generic partitioning, FDISK and SFD. */
    bsect = 0;

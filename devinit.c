@@ -92,7 +92,8 @@ uint16_t DeviceInit( void )
     uint16_t offset;
     uint16_t brkadr, reboot[2];  
     void (__interrupt far *reboot_address)();  /* Reboot vector */
-    uint8_t far *bpb_pointer;
+    bpb far *bpb_ptr;
+    char far *bpb_cast_ptr;
 
     get_all_registers(&registers);
 
@@ -110,47 +111,45 @@ uint16_t DeviceInit( void )
     //DOS is overloading a data structure that in normal use stores the BPB, 
     //for init() it stores the string that sits in config.sys
     //hence I'm casting to a char
-    bpb_pointer = (uint8_t __far *)(fpRequest->r_bpbptr);  
-    cdprintf("gathered bpb_pointer: %x\n", bpb_pointer);
+    bpb_cast_ptr = (char __far *)(fpRequest->r_bpbptr);  
+    bpb_ptr = *(fpRequest->r_bpbptr);   //also need the BPB to return results to DOS
+
+    cdprintf("gathered bpb_ptr: %x\n", bpb_ptr);
     /* Parse the options from the CONFIG.SYS file, if any... */
-    if (!parse_options((char far *) bpb_pointer)) {
+    if (!parse_options((char far *) bpb_cast_ptr)) {
         cdprintf("SD: bad options in CONFIG.SYS\n");
         goto unload2;   
     }
-    cdprintf("done parsing bpb_pointer: %x\n", bpb_pointer);
+    cdprintf("done parsing bpb_ptr: %x\n", bpb_ptr);
 
     /* Try to make contact with the drive... */
     if (Debug) cdprintf("SD: initializing drive\n");
-    if (!sd_initialize(fpRequest->r_unit, partition_number, fpRequest->r_bpbptr)) {
+    if (!sd_initialize(fpRequest->r_unit, partition_number, bpb_ptr))    {
         cdprintf("SD: drive not connected or not powered\n");
         goto unload1;
     }
-    cdprintf("SD: rh = %4x:%4x\n", FP_SEG(bpb_pointer), FP_OFF(bpb_pointer));
+    cdprintf("SD: bpb_ptr = %4x:%4x\n", FP_SEG(bpb_ptr), FP_OFF(bpb_ptr));
 
     // /* All is well.  Tell DOS how many units and the BPBs... */
-    // cdprintf("SD initialized on DOS drive %c\n",
-    //     rh->drive+'A');
-    // rh->nunits = 1;  
-    // rh->bpbtbl = &bpbtbl;
-    // rh->rh.status = DONE;
+    cdprintf("SD initialized on DOS drive %c\n",(fpRequest->r_firstunit + 'A'));
 
-  //   if (Debug)
-  //   {   
-  //     cdprintf("SD: BPB data:\n");
-  //     cdprintf("Sector Size: %d   ", bpb.sector_size);
-  //     cdprintf("Allocation unit: %d\n", bpb.allocation_unit);
-  //     cdprintf("Reserved sectors: %d  ", bpb.reserved_sectors);
-  //     cdprintf("Fat Count: %d\n", bpb.fat_count);
-  //     cdprintf("Directory size: %d  ", bpb.directory_size);
-  //     cdprintf("Total sectors: %d\n", bpb.total_sectors);
-  //     cdprintf("Media descriptor: %x  ", bpb.media_descriptor);
-  //     cdprintf("Fat sectors: %d\n", bpb.fat_sectors);
-  //     cdprintf("Track size: %d  ", bpb.track_size);
-  //     cdprintf("Head count: %d\n", bpb.head_count);
-  //     cdprintf("Hidden sectors: %d  ", bpb.hidden_sectors);
-  //     cdprintf("Sector Ct 32 hex: %L\n", bpb.sector_count);
-  //     cdprintf("Partition offset: %L\n", partition_offset);
-  // }
+    if (Debug)
+    {   
+      cdprintf("SD: BPB data:\n");
+      cdprintf("Bytes per Sector: %d   ", bpb_ptr->bpb_nbyte);
+      cdprintf("Sectors per Allocation Unit: %d\n", bpb_ptr->bpb_nsector);
+      cdprintf("# Reserved Sectors: %d  ", bpb_ptr->bpb_nreserved);
+      cdprintf("# FATs: %d\n", bpb_ptr->bpb_nfat);
+      cdprintf("# Root Directory entries: %d  ", bpb_ptr->bpb_ndirent);
+      cdprintf("Size in sectors: %d\n", bpb_ptr->bpb_nsize);
+      cdprintf("MEDIA Descriptor Byte: %x  ", bpb_ptr->bpb_mdesc);
+      cdprintf("FAT size in sectors: %d\n", bpb_ptr->bpb_nfsect);
+      cdprintf("Sectors per track : %d  ", bpb_ptr->bpb_nsecs);
+      cdprintf("Number of heads: %d\n", bpb_ptr->bpb_nheads);
+      cdprintf("Hidden sectors: %d  ", bpb_ptr->bpb_hidden);
+      cdprintf("Hidden sectors 32 hex: %L\n", bpb_ptr->bpb_hidden);
+      cdprintf("Size in sectors if : %L\n", bpb_ptr->bpb_huge);
+  }
   return 0;
 
   /*   We get here if there are any errors in initialization.  In that  */
