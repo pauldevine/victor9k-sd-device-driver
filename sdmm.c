@@ -61,21 +61,33 @@ typedef struct {
 /  Bit definitions for Centronics-style parallel interface, 'via1'.        /
 /-------------------------------------------------------------------------*/ 
 #define PHASE2_DEVICE_SEGMENT 0xE800
-#define VIA1_REG_OFFSET   0x0020    // baseaddr for centronics    
-#define DATA_1            0x08      // data strobe (PA0)         
-#define DATA_2            0x09      // this datum for vfu (PA1)  
-#define DATA_3            0x10      // this datum for vfu (PA2)  
-#define DATA_STROBE_L     0x01      // printer busy (PB0)        
-#define END_OR_IDENTIFY_H 0x02      // printer busy (PB1)        
-#define BUSY_H            0x20      // printer busy (PB5)        
-#define ACKNOWLEDGE_L     0x40      // printer ack (PB6)         
-#define SELECT_H_OFFSET   0x80      // on-line and no error (PB7)
+#define VIA1_REG_OFFSET    0x0020    // baseaddr for centronics    
+#define DATA_0_OFFSET      0x01      // data strobe (PA0) / Pin 2 on DB-25
+#define DATA_1_OFFSET      0x02      // this datum for vfu (PA1) / Pin 3 on DB-25 
+#define DATA_2_OFFSET      0x04      // this datum for vfu (PA2) / Pin 4 on DB-25
+#define DATA_STROBE_L      0x01      // printer busy (PB0)  / Pin 1 on DB-25      
+#define END_OR_IDENTIFY_H  0x02      // printer busy (PB1)  / Pin 15 on DB-25
+#define BUSY_H             0x20      // printer busy (PB5)  / Pin 11 on DB-25
+#define ACKNOWLEDGE_L      0x40      // printer ack (PB6)   / Pin 10 on DB-25      
+#define SELECT_H_OFFSET    0x80      // on-line and no error (PB7) / Pin 13 on DB-25
+
+/* something about our makefile isn't letting these be linked, defining here */
+extern void Enable( void );
+#pragma aux Enable = \
+    "sti" \
+    parm [] \
+    modify [];
+extern void Disable( void );
+#pragma aux Disable = \
+    "cli" \
+    parm [] \
+    modify [];
 
 /*-------------------------------------------------------------------------/ 
 / Bit definitions for multi-use pio, 'via2'.                               /
 /-------------------------------------------------------------------------*/
-#define VIA2_REG_OFFSET   0x0040    // base address user port via3
-#define TALK_ENABLE_H 0x01          // talk-enable line
+#define VIA2_REG_OFFSET   0x0040    // base address user port via2
+#define TALK_ENABLE_H 0x01          // talk-enable line line VIA2 PB0
 
 
 static volatile V9kParallelPort far *via1 = MK_FP(PHASE2_DEVICE_SEGMENT, 
@@ -88,11 +100,17 @@ static volatile V9kParallelPort far *via2 = MK_FP(PHASE2_DEVICE_SEGMENT,
 /*-------------------------------------------------------------------------*/
 
 inline void outportbyte(volatile uint8_t far* port, uint8_t value) {
-    *port = value;
+    cdprintf("outportbyte: port %x, value %x\n", (void*)port, value);
+    Disable();  /* Disable interrupts */
+    via1->out_in_reg_a = value;
+    Enable();   /* Enable interrupts */
+    //*port = value;
 }
 
-inline uint8_t inportbyte(volatile uint8_t far* port) {
-    return *port;
+inline uint8_t inportbyte(volatile uint8_t far* port) { 
+   uint8_t data = via1->out_in_reg_b;
+   cdprintf("inportbyte: data: %x\n", data);
+   return data;
 }
 
 //Victor 9K 0xE8020 for VIA 1 external parallel port
@@ -108,30 +126,43 @@ static volatile uint8_t far *STATUSPORT;
 static volatile uint8_t far *CONTROLPORT;
 
 void par_port_init(void) {
-    //Via-1 is main parallel port 
-    cdprintf("Address of via1: %x\n", (void*)via1);    
-    cdprintf("via1->out_in_reg_a: %x\n", (void*)via1);          
-    via1->out_in_reg_a = 0;               /* out_in_reg_a is dataport, init with 0's =output bits */ 
-    cdprintf("data_dir_reg_a\n"); 
-    via1->data_dir_reg_a = 0xFF;          /* register a is all outbound, 11111= all bits outgoing */
-    cdprintf("out_in_reg_b\n"); 
-    via1->out_in_reg_b = 0;               /* out_in_reg_b is input, clear register                */
-    cdprintf("data_dir_reg_b\n"); 
-    via1->data_dir_reg_b = 0;             /* register b is all inbound, init with 0's             */
-    cdprintf("periph_ctrl_reg\n"); 
-    via1->periph_ctrl_reg = 0;            /* setting incoming usage of CA1/CA2 lines              */
+   //Via-1 is main parallel port 
+   cdprintf("Address of via1: %x\n", (void*)via1);    
+   cdprintf("via1->out_in_reg_a: %x\n", (void*)via1);          
+   via1->out_in_reg_a = 0;               /* out_in_reg_a is dataport, init with 0's =output bits */ 
+   cdprintf("data_dir_reg_a\n"); 
+   via1->data_dir_reg_a = 0xFF;          /* register a is all outbound, 11111= all bits outgoing */
+   cdprintf("out_in_reg_b\n"); 
+   via1->out_in_reg_b = 0;               /* out_in_reg_b is input, clear register                */
+   cdprintf("data_dir_reg_b\n"); 
+   via1->data_dir_reg_b = 0;             /* register b is all inbound, init with 0's             */
+   cdprintf("periph_ctrl_reg\n"); 
+   via1->periph_ctrl_reg = 0;            /* setting incoming usage of CA1/CA2 lines              */
 
-    //Via-2 PB1 controls talk-enable line
-    cdprintf("Address of via2: %p\n", (void*)via2);
-    cdprintf("via2 data_dir_reg_b\n"); 
-    via2->data_dir_reg_b |= TALK_ENABLE_H;                /* set talk-enable output           */
-    cdprintf("via2 out_in_reg_b\n"); 
-    via2->out_in_reg_b |= TALK_ENABLE_H;                  /* set talk-enable true           */
-    cdprintf("about to return init()\n"); 
-    OUTPORT=&via1->out_in_reg_a;
-    STATUSPORT=&via1->out_in_reg_b;
-    CONTROLPORT=&via1->out_in_reg_b;
-    return;
+   //Via-2 PB1 controls talk-enable line
+   cdprintf("Address of via2: %x\n", (void*)via2);
+   cdprintf("via2 talk enable output\n"); 
+   via2->data_dir_reg_b |= TALK_ENABLE_H;                /* set talk-enable pin to output mode   */
+   cdprintf("via2 talk enable true\n"); 
+   via2->out_in_reg_b |= TALK_ENABLE_H;                  /* set talk-enable pin value to true    */
+   cdprintf("about to return init()\n"); 
+   OUTPORT=&via1->out_in_reg_a;
+   STATUSPORT=&via1->out_in_reg_b;
+   CONTROLPORT=&via1->out_in_reg_b;
+
+   //say hello
+   cdprintf("output false\n"); 
+   outportbyte(OUTPORT,0);
+   cdprintf("output true\n"); 
+   outportbyte(OUTPORT,0xFF);
+   BITDLY();
+   outportbyte(OUTPORT,0);
+   BITDLY();
+   outportbyte(OUTPORT,0xFF);
+   BITDLY();
+   outportbyte(OUTPORT,0);
+   BITDLY();
+   return;
 }
 
 /*-------------------------------------------------------------------------/ 
@@ -146,16 +177,16 @@ void par_port_init(void) {
 
 /* MISOPIN (SD card DAT0/DO pin 7) is PPORT SELECT (DB-25 pin 13) */
 #define MISOPIN     (0x01 << 7)
-/* Card Detect (N/A) is PPORT BUSY (DB-25 pin 11) */
+/* Card Detect (N/A) is PPORT BUSY (VIA 1 PB5 / DB-25 pin 11) */
 #define CDDETECTPIN (0x01 << 5)
 
 /* Do not interface 5 to 3.3 volts directly! Use level converter... */
 
-/* MOSI (SD card CMD/DI pin 2) is PPORT D0 (DB-25 pin 2) */
+/* MOSI (SD card CMD/DI pin 2) is PPORT D0 (VIA 1 PA0 / DB-25 pin 2) */
 #define MOSIPIN     (0x01 << 0)
-/* CLOCK (SD card CLK/SCLK pin 5) is PPORT D1 (DB-25 pin 3) */
+/* CLOCK (SD card CLK/SCLK pin 5) is PPORT D1 (VIA 1 PA1 / DB-25 pin 3) */
 #define CLOCKPIN    (0x01 << 1)
-/* Card Select (SD card CAT3/CS pin 1) is PPORT D2 (DB-25 pin 4) */
+/* Card Select (SD card CAT3/CS pin 1) is PPORT D2 (VIA 1 PA2 / DB-25 pin 4) */
 #define CSPIN       (0x01 << 2)
 /* Connect ground to one of PPORT pins 18-25 */
 
@@ -214,7 +245,7 @@ const int bit_delay_us = 10;
 
 
 #define DO(statusport) (inportbyte((statusport)) & MISOPIN)  
-#define CDDETECT(statusport) (inportbyte((statusport)) & CDDETECTPIN)
+#define CDDETECT(statusport) (0)
 #define CLOCKBITHIGHMOSIHIGH(outport) outportbyte((outport),MOSIPIN|CLOCKPIN) 
 #define CLOCKBITHIGHMOSILOW(outport) outportbyte((outport),CLOCKPIN) 
 #define CLOCKBITLOWMOSIHIGH(outport) outportbyte((outport),MOSIPIN) 
@@ -296,7 +327,7 @@ uint32_t dwordrshift(uint32_t d, int n)
 /* MMC/SD command (SPI mode) */
 #define CMD0   (0)         /* GO_IDLE_STATE */
 #define CMD1   (1)         /* SEND_OP_COND */
-#define  ACMD41   (0x80+41)   /* SEND_OP_COND (SDC) */
+#define ACMD41 (0x80+41)   /* SEND_OP_COND (SDC) */
 #define CMD8   (8)         /* SEND_IF_COND */
 #define CMD9   (9)         /* SEND_CSD */
 #define CMD10  (10)     /* SEND_CID */
@@ -307,7 +338,7 @@ uint32_t dwordrshift(uint32_t d, int n)
 #define CMD17  (17)     /* READ_SINGLE_BLOCK */
 #define CMD18  (18)     /* READ_MULTIPLE_BLOCK */
 #define CMD23  (23)     /* SET_BLOCK_COUNT */
-#define  ACMD23   (0x80+23)   /* SET_WR_BLK_ERASE_COUNT (SDC) */
+#define ACMD23 (0x80+23)   /* SET_WR_BLK_ERASE_COUNT (SDC) */
 #define CMD24  (24)     /* WRITE_BLOCK */
 #define CMD25  (25)     /* WRITE_MULTIPLE_BLOCK */
 #define CMD32  (32)     /* ERASE_ER_BLK_START */
