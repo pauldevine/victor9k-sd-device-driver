@@ -58,8 +58,8 @@
 
 #pragma data_seg("_CODE")
 bool Debug = TRUE;
-uint8_t portbase;
-uint8_t partition_number;
+static uint8_t portbase;
+static uint8_t partition_number;
 //
 // Place here any variables or constants that should go away after initialization
 //

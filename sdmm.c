@@ -71,17 +71,6 @@ typedef struct {
 #define ACKNOWLEDGE_L      0x40      // printer ack (PB6)   / Pin 10 on DB-25      
 #define SELECT_H_OFFSET    0x80      // on-line and no error (PB7) / Pin 13 on DB-25
 
-/* something about our makefile isn't letting these be linked, defining here */
-extern void Enable( void );
-#pragma aux Enable = \
-    "sti" \
-    parm [] \
-    modify [];
-extern void Disable( void );
-#pragma aux Disable = \
-    "cli" \
-    parm [] \
-    modify [];
 
 /*-------------------------------------------------------------------------/ 
 / Bit definitions for multi-use pio, 'via2'.                               /
@@ -95,21 +84,61 @@ static volatile V9kParallelPort far *via1 = MK_FP(PHASE2_DEVICE_SEGMENT,
 static volatile V9kParallelPort far *via2 = MK_FP(PHASE2_DEVICE_SEGMENT, 
                                                            VIA2_REG_OFFSET);
 
+#define DO_INIT()
+#define DI_INIT()
+#define CK_INIT() 
+#define CS_INIT()
+
+const int bit_delay_us = 175;
+
+#define BITDLY() delay_us(bit_delay_us)
+
 /*-------------------------------------------------------------------------*/
 /* Platform dependent function to output and input bytes on port           */
 /*-------------------------------------------------------------------------*/
 
-inline void outportbyte(volatile uint8_t far* port, uint8_t value) {
-    cdprintf("outportbyte: port %x, value %x\n", (void*)port, value);
+/* something about our makefile isn't letting these be linked, defining here */
+extern void Enable( void );
+#pragma aux Enable = \
+    "sti" \
+    parm [] \
+    modify [];
+extern void Disable( void );
+#pragma aux Disable = \
+    "cli" \
+    parm [] \
+    modify [];
+
+static void delay_us(unsigned int n);
+#pragma aux delay_us = \
+    "mov cx, ax", \
+    "loopit:", \
+    "loop loopit", \
+    parm [ax] \
+    modify [cx];
+
+
+void par_port_init(void);
+
+void outportbyte(volatile uint8_t far* port, uint8_t value) {
+    //cdprintf("outportbyte: port %x, value %x\n", (void*)via1, value);
+    if (! via_initialized) {
+         //cdprintf("outportbyte: VIA NOT INITIALIZED, calling par_port_init()\n");
+         par_port_init();
+    }
     Disable();  /* Disable interrupts */
     via1->out_in_reg_a = value;
     Enable();   /* Enable interrupts */
     //*port = value;
+    return;
 }
 
-inline uint8_t inportbyte(volatile uint8_t far* port) { 
-   uint8_t data = via1->out_in_reg_b;
-   cdprintf("inportbyte: data: %x\n", data);
+uint8_t inportbyte(volatile uint8_t far* port) { 
+   uint8_t data;
+   Disable();  /* Disable interrupts */
+   data = via1->out_in_reg_b;
+   Enable();   /* Enable interrupts */
+   //cdprintf("inportbyte: data: %x\n", data);
    return data;
 }
 
@@ -121,39 +150,41 @@ inline uint8_t inportbyte(volatile uint8_t far* port) {
 uint8_t sd_card_check = 0; 
 uint8_t portbase = 1;
 
+
 static volatile uint8_t far *OUTPORT;
 static volatile uint8_t far *STATUSPORT;
 static volatile uint8_t far *CONTROLPORT;
 
 void par_port_init(void) {
    //Via-1 is main parallel port 
-   cdprintf("Address of via1: %x\n", (void*)via1);    
-   cdprintf("via1->out_in_reg_a: %x\n", (void*)via1);          
+   // cdprintf("Address of via1: %x\n", (void*)via1);    
+   // cdprintf("via1->out_in_reg_a: %x\n", (void*)via1);          
    via1->out_in_reg_a = 0;               /* out_in_reg_a is dataport, init with 0's =output bits */ 
-   cdprintf("data_dir_reg_a\n"); 
-   via1->data_dir_reg_a = 0xFF;          /* register a is all outbound, 11111= all bits outgoing */
-   cdprintf("out_in_reg_b\n"); 
+   //cdprintf("data_dir_reg_a\n"); 
+   via1->data_dir_reg_a = 0xFF;          /* register a is all outbound, 1111 = all bits outgoing */
+   //cdprintf("out_in_reg_b\n"); 
    via1->out_in_reg_b = 0;               /* out_in_reg_b is input, clear register                */
-   cdprintf("data_dir_reg_b\n"); 
-   via1->data_dir_reg_b = 0;             /* register b is all inbound, init with 0's             */
-   cdprintf("periph_ctrl_reg\n"); 
-   via1->periph_ctrl_reg = 0;            /* setting incoming usage of CA1/CA2 lines              */
+   //cdprintf("data_dir_reg_b\n"); 
+   via1->data_dir_reg_b = 0x00;             /* register b is all inbound, init with 0000's             */
+   //cdprintf("periph_ctrl_reg\n"); 
+   via1->periph_ctrl_reg = 0x00;            /* setting incoming usage of CA1/CA2 lines              */
+   //via1->aux_ctrl_reg = 0x00;             /* turn off the timer / shift registers / etc.       */
 
    //Via-2 PB1 controls talk-enable line
-   cdprintf("Address of via2: %x\n", (void*)via2);
-   cdprintf("via2 talk enable output\n"); 
+   // cdprintf("Address of via2: %x\n", (void*)via2);
+   // cdprintf("via2 talk enable output\n"); 
    via2->data_dir_reg_b |= TALK_ENABLE_H;                /* set talk-enable pin to output mode   */
-   cdprintf("via2 talk enable true\n"); 
+   //cdprintf("via2 talk enable true\n"); 
    via2->out_in_reg_b |= TALK_ENABLE_H;                  /* set talk-enable pin value to true    */
-   cdprintf("about to return init()\n"); 
+   //cdprintf("about to return init()\n"); 
    OUTPORT=&via1->out_in_reg_a;
    STATUSPORT=&via1->out_in_reg_b;
    CONTROLPORT=&via1->out_in_reg_b;
+   via_initialized = true;
 
+   cdprintf("Finished via_initialized, cycling bits\n");
    //say hello
-   cdprintf("output false\n"); 
-   outportbyte(OUTPORT,0);
-   cdprintf("output true\n"); 
+   BITDLY(); 
    outportbyte(OUTPORT,0xFF);
    BITDLY();
    outportbyte(OUTPORT,0);
@@ -162,6 +193,13 @@ void par_port_init(void) {
    BITDLY();
    outportbyte(OUTPORT,0);
    BITDLY();
+   outportbyte(OUTPORT,0xFF);
+   BITDLY();
+   outportbyte(OUTPORT,0);
+   BITDLY();
+   outportbyte(OUTPORT,0xFF);
+   BITDLY();
+   
    return;
 }
 
@@ -231,21 +269,14 @@ void setportbase(uint8_t val)
   //  //todo fix this assignment
   //   //OUTPORT = portbases[val-1];
   portbase=val;
-  VAR_INIT();
+  par_port_init();
 }
 
-#define DO_INIT()
-#define DI_INIT()
-#define CK_INIT() 
-#define CS_INIT()
 
-const int bit_delay_us = 10;
-
-#define BITDLY() delay_us(bit_delay_us)
 
 
 #define DO(statusport) (inportbyte((statusport)) & MISOPIN)  
-#define CDDETECT(statusport) (0)
+#define CDDETECT(statusport) (1)
 #define CLOCKBITHIGHMOSIHIGH(outport) outportbyte((outport),MOSIPIN|CLOCKPIN) 
 #define CLOCKBITHIGHMOSILOW(outport) outportbyte((outport),CLOCKPIN) 
 #define CLOCKBITLOWMOSIHIGH(outport) outportbyte((outport),MOSIPIN) 
@@ -258,16 +289,7 @@ const int bit_delay_us = 10;
 
 #define ADJ_VAL 1
 
-static void delay_us(unsigned int n);
-#pragma aux delay_us = \
-    "mov cx, ax", \
-    "loopit:", \
-    "loop loopit", \
-    parm [ax] \
-    modify [cx];
-
 #define NOSHIFT
-
 #ifdef NOSHIFT 
 
 uint32_t dwordlshift(uint32_t d, int n)

@@ -14,6 +14,7 @@ extern "C" {
 
 /* Status of Disk Functions */
 typedef uint8_t   DSTATUS;
+bool via_initialized = false;
 
 /* Results of Disk Functions */
 typedef enum {
