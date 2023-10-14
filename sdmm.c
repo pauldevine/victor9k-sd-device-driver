@@ -89,7 +89,9 @@ static volatile V9kParallelPort far *via2 = MK_FP(PHASE2_DEVICE_SEGMENT,
 #define CK_INIT() 
 #define CS_INIT()
 
+static bool via_initialized;
 const int bit_delay_us = 175;
+
 
 #define BITDLY() delay_us(bit_delay_us)
 
@@ -268,6 +270,7 @@ void setportbase(uint8_t val)
   // if ((val >= 1) && (val <= (sizeof(portbases)/sizeof(portbases[0])) ))
   //  //todo fix this assignment
   //   //OUTPORT = portbases[val-1];
+  via_initialized = false;
   portbase=val;
   par_port_init();
 }

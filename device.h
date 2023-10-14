@@ -120,6 +120,11 @@
 #define C_MAXCMD        C_IOCTLQRY
 
 /*
+ * IOCTL Commands Victor 9K Specific
+ */
+#define GET_DISK_DRIVE_PHYSICAL_INFO 0x10
+
+/*
  *      Convienence macros
  */
 #define failure(x)      (S_ERROR+S_DONE+x)
@@ -424,6 +429,14 @@ typedef struct {
     } _r_gen;
   } _r_x;
 } request;
+
+typedef struct {
+      uint16_t ioctl_type;
+      uint16_t ioctl_status;      /* always 0x10h. */
+      uint8_t  disk_type;         /* 0 = floppy. 1 = hard drive */
+      uint8_t  disk_location;     /* for floppy only 0 = left, 1 = right drive */
+} v9k_disk_info;
+
 
 #define HUGECOUNT       0xffff
 #define MAXSHORT        0xffffl

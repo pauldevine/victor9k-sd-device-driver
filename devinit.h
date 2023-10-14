@@ -21,9 +21,11 @@
  */
 #ifndef _DEVINIT_H_
 #define _DEVINIT_H_
+#include <stdbool.h>
 
 extern void *transient_data;
+extern bool debug;
 
-extern uint16_t DeviceInit( void );
+extern uint16_t device_init( void );
 
 #endif /* _DEVINIT_H_ */

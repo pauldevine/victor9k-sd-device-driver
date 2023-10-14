@@ -58,6 +58,7 @@ struct ALL_REGS {
 
 extern uint8_t *stack_bottom;
 extern uint32_t dos_stack;
+extern bool debug;
 
 extern void switch_stack( void );
 #pragma aux switch_stack = \
@@ -90,6 +91,10 @@ extern void pop_regs( void );
     pop_segregs \
     pop_all \
     "popf";
+
+extern __segment getCS( void );
+#pragma aux getCS = \
+    "mov ax, cs";
 
 extern __segment getCS( void );
 #pragma aux getCS = \

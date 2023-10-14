@@ -55,9 +55,10 @@
 #include "template.h"
 #include "cprint.h"     /* Console printing direct to hardware */
 #include "sd.h"         /* SD card glue */
+#include "diskio.h"     /* SD card library header */
 
 #pragma data_seg("_CODE")
-bool Debug = TRUE;
+bool debug = TRUE;
 static uint8_t portbase;
 static uint8_t partition_number;
 //
@@ -86,7 +87,7 @@ static char test_message[] = "Test message\n";
 /* and make contact with the SD card, and then return a table of BPBs to   */
 /* DOS.  If we can't communicate with the drive, then the entire driver */
 /* is unloaded from memory.                  */
-uint16_t DeviceInit( void )
+uint16_t device_init( void )
 {
     struct ALL_REGS registers;
     uint16_t offset;
@@ -123,7 +124,7 @@ uint16_t DeviceInit( void )
     cdprintf("done parsing bpb_ptr: %x\n", bpb_ptr);
 
     /* Try to make contact with the drive... */
-    if (Debug) cdprintf("SD: initializing drive\n");
+    if (debug) cdprintf("SD: initializing drive\n");
     if (!sd_initialize(fpRequest->r_unit, partition_number, bpb_ptr))    {
         cdprintf("SD: drive not connected or not powered\n");
         goto unload1;
@@ -133,12 +134,12 @@ uint16_t DeviceInit( void )
     // /* All is well.  Tell DOS how many units and the BPBs... */
     cdprintf("SD initialized on DOS drive %c\n",(fpRequest->r_firstunit + 'A'));
 
-    if (Debug)
+    if (debug)
     {   
       cdprintf("SD: BPB data:\n");
-      cdprintf("Bytes per Sector: %d   ", bpb_ptr->bpb_nbyte);
+      cdprintf("Bytes per Sector: %d\n", bpb_ptr->bpb_nbyte);
       cdprintf("Sectors per Allocation Unit: %d\n", bpb_ptr->bpb_nsector);
-      cdprintf("# Reserved Sectors: %d  ", bpb_ptr->bpb_nreserved);
+      cdprintf("# Reserved Sectors: %d\n", bpb_ptr->bpb_nreserved);
       cdprintf("# FATs: %d\n", bpb_ptr->bpb_nfat);
       cdprintf("# Root Directory entries: %d  ", bpb_ptr->bpb_ndirent);
       cdprintf("Size in sectors: %d\n", bpb_ptr->bpb_nsize);
@@ -205,8 +206,8 @@ bool parse_options (char far *p)
     switch (*p++) {
     case 'd':
     case 'D':
-        Debug = TRUE;
-        cdprintf("Parsing Debug as true\n");
+        debug = TRUE;
+        cdprintf("Parsing debug as true\n");
         break;
     case 'k':
     case 'K':
