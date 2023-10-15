@@ -22,8 +22,11 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <dos.h>
+#include <string.h>
 
 #include "device.h"
+#include "diskio.h"
 #include "devinit.h"
 #include "template.h"
 #include "cprint.h"     /* Console printing direct to hardware */
@@ -34,6 +37,7 @@
 static uint8_t our_stack[STACK_SIZE];
 uint8_t *stack_bottom = our_stack + STACK_SIZE;
 uint32_t dos_stack;
+bool init_needed = TRUE;
 
 #endif // USE_INTERNAL_STACK
 
@@ -56,8 +60,13 @@ static uint16_t close( void )
 /* response.  This works well enough...                                */
 static uint16_t media_check (void)
 {
-  if (debug) cdprintf("SD: media_check: unit=%d\n", fpRequest->r_mcvid);
-  fpRequest->r_mcretcode = sd_media_check(fpRequest->r_unit) ? M_CHANGED : M_NOT_CHANGED;
+  struct ALL_REGS registers;
+  get_all_registers(&registers);
+  //media_check_data far *media_ptr;
+
+  fpRequest->r_media_check = MK_FP(registers.ds, registers.dx);
+  if (debug) cdprintf("SD: media_check: unit=%d\n", fpRequest->r_mc_vol_id);
+  fpRequest->r_mc_ret_code = sd_media_check(*fpRequest->r_mc_vol_id) ? M_CHANGED : M_NOT_CHANGED;
   return M_NOT_CHANGED;
 }
 
@@ -76,49 +85,38 @@ static uint16_t build_bpb (void)
 
 static uint16_t IOCTL_input(void)
 {
-    CHCPCMD __far *command = (CHCPCMD __far *)fpRequest->r_trans;
+    struct ALL_REGS registers;
+    bool success, hard_disk, left;
+    get_all_registers(&registers);
 
-    DPUTS("IOCTLOutput()");
+    fpRequest->r_v9k_disk_info_ptr = MK_FP(registers.ds, registers.dx);
 
-    if (fpRequest->r_count >= sizeof(CHCPCMD))
+    cdprintf("SD: IOCTL_Input()");
     {
-        switch (command->num)
+        switch (fpRequest->r_di_ioctl_type)
         {
         case GET_DISK_DRIVE_PHYSICAL_INFO:
-            v9k_disk_info *sd_card_info;
-            sd_card_info = malloc(sizeof(v9k_disk_info));
-            v9k_disk_info->ioctl_type = GET_DISK_DRIVE_PHYSICAL_INFO;
-            bool success = 0;
-            bool hard_disk = true;
-            bool left = false;
-            v9k_disk_info->ioctl_status = success;
-            v9k_disk_info->disk_type = hard_disk;
-            v9k_disk_info->disk_location = left;
-            return v9k_disk_info;
+            cdprintf("SD: IOCTL_Input() - GET_DISK_DRIVE_PHYSICAL_INFO");
+            fpRequest->r_di_ioctl_type = GET_DISK_DRIVE_PHYSICAL_INFO;
+            success = 0;         /* 0 = success, 1 = failure */
+            hard_disk = true;
+            left = false;
+            fpRequest->r_di_ioctl_status = success;
+            fpRequest->r_di_disk_type = hard_disk;
+            fpRequest->r_di_disk_location = left;
+
+            cdprintf("SD: IOCTL_Input() - GET_DISK_DRIVE_PHYSICAL_INFO - success: %d", success);
+
+            return S_DONE;
             break;
 
         default:
-            return (S_DONE | S_ERROR | E_CMD);
+            return (S_DONE | S_ERROR | E_UNKNOWN_COMMAND);
             break;
         }
     }
 
-    return (S_DONE | S_ERROR | E_LENGTH);
-}
-
-/* Get Parameters */
-/*   This routine implements the Get Parameters subfunction of the DOS  */
-/* Generic IOCTL call. It gets a pointer to the device paramters block, */
-/* which it then fills in.  We do NOT create the track/sector map that  */
-/* is defined by recent DOS manuals to be at the end of the block - it  */
-/* never seems to be used...                 */
-static void get_parameters (device_params_t far *dp)
-{
-  dp->form_factor = FORM_FACTOR;  
-  dp->attributes = 0;  
-  dp->media_type = 0;
-  dp->cylinders = bpb.total_sectors / (bpb.track_size * bpb.head_count);
-  _fmemcpy(&(dp->bpb), &bpb, sizeof(bpb_t));
+    return (S_DONE | S_ERROR | E_HEADER_LENGTH);
 }
 
 /* dos_error */
@@ -135,14 +133,14 @@ int dos_error (int status)
 {
   switch (status) {
     case RES_OK:     return 0;
-    case RES_WRPRT:  return WRITE_PROTECT;
-    case RES_NOTRDY: InitNeeded= TRUE; return NOT_READY;
-    case RES_ERROR:  InitNeeded= TRUE; return BAD_SECTOR;
-    case RES_PARERR: return CRC_ERROR;
+    case RES_WRPRT:  return E_WRITE_PROTECT;
+    case RES_NOTRDY: init_needed = TRUE; return E_NOT_READY;
+    case RES_ERROR:  init_needed = TRUE; return E_SECTOR_NOT_FND;
+    case RES_PARERR: return E_CRC_ERROR;
 
     default:
     cdprintf("SD: unknown drive error - status = 0x%2x\n", status);
-        return GENERAL_FAILURE;
+        return E_GENERAL_FAILURE;
   }
 }
 
@@ -152,60 +150,97 @@ unsigned get_stackpointer();
     value [ax];
 
 /* Read Data */
-void read_block (rh_io_t far *rh)
+
+static uint16_t read_block (void)
 {
   uint32_t lbn;
-  uint16_t count;  int status;  uint8_t far *dta;
+  uint16_t count;  
+  int status;  
+  uint8_t far *dta;
   uint16_t sendct;
-  if (Debug)
+  struct ALL_REGS registers;
+  bool success, hard_disk, left;
+
+  get_all_registers(&registers);
+
+  fpRequest->r_rw_ptr = MK_FP(registers.ds, registers.dx);
+
+  if (debug) {
     cdprintf("SD: read block: unit=%d, start=%d, count=%d, dta=%4x:%4x\n",
-      rh->rh.unit, rh->start, rh->count, FP_SEG(rh->dta), FP_OFF(rh->dta));
-  if (!drive_init ((rh_t far *) rh))  return;
-  count = rh->count,  lbn = rh->start,  dta = rh->dta;
-  lbn = (rh->start == 0xFFFF) ? rh->longstart : rh->start;
+             fpRequest->r_rw_vol_id, fpRequest->r_start, fpRequest->r_count, 
+             FP_SEG(fpRequest->r_rw_ptr), FP_OFF(fpRequest->r_rw_ptr));
+  }
+  if (init_needed)  return (S_DONE | S_ERROR | E_NOT_READY); //not initialized yet
+
+  count = fpRequest->r_count,  
+          fpRequest->r_start,  
+          dta = fpRequest->r_trans;
+  lbn = (fpRequest->r_start == 0xFFFF) ? fpRequest->r_huge : fpRequest->r_start;
   while (count > 0) {
       sendct = (count > 16) ? 16 : count;
-      status = SDRead(rh->rh.unit, lbn, dta, sendct);
+      status = sd_read(*fpRequest->r_rw_vol_id, lbn, dta, sendct);
+
       if (status != RES_OK)  {
-   if (Debug) cdprintf("SD: read error - status=%d\n", status);
-   _fmemset(dta, 0, BLOCKSIZE);
-   rh->rh.status = DONE | ERROR | dos_error(status);
-   return;
+        if (debug) cdprintf("SD: read error - status=%d\n", status);
+        _fmemset(dta, 0, BLOCKSIZE);
+        return (S_DONE | S_ERROR | dos_error(status));
       }
+
     lbn += sendct;
     count -= sendct;
     dta += (sendct*BLOCKSIZE);
   }
-  rh->rh.status = DONE;
+  return (S_DONE);
 }
 
 
 /* Write Data */
 /* Write Data with Verification */
-void write_block (rh_io_t far *rh, bool verify)
+static uint16_t write_block (bool verify)
 {
   uint32_t lbn;
-  uint16_t count;  int status;  uint8_t far *dta;
+  uint16_t count;  
+  int status; 
+  uint8_t far *dta;
   uint16_t sendct;
-  if (Debug)
-    cdprintf("SD: %d write block: unit=%d, start=%d, count=%d, dta=%4x:%4x\n",
-      verify, rh->rh.unit, rh->start, rh->count, FP_SEG(rh->dta), FP_OFF(rh->dta));
-  if (!drive_init ((rh_t far *) rh))  return;
-  count = rh->count,  dta = rh->dta;
-  lbn = (rh->start == 0xFFFF) ? rh->longstart : rh->start;
+  struct ALL_REGS registers;
+  bool success, hard_disk, left;
+
+  get_all_registers(&registers);
+  fpRequest->r_rw_ptr = MK_FP(registers.ds, registers.dx);
+
+  if (debug) {
+    cdprintf("SD: write block: verify=%d unit=%d, start=%d, count=%d, dta=%4x:%4x\n",
+             verify, fpRequest->r_rw_vol_id, fpRequest->r_start, fpRequest->r_count, 
+             FP_SEG(fpRequest->r_rw_ptr), FP_OFF(fpRequest->r_rw_ptr));
+  }
+  if (init_needed)  return (S_DONE | S_ERROR | E_NOT_READY); //not initialized yet
+  count = fpRequest->r_count, dta = fpRequest->r_trans;
+  lbn = (fpRequest->r_start == 0xFFFF) ? fpRequest->r_huge : fpRequest->r_start;
   while (count > 0) {
     sendct = (count > 16) ? 16 : count;
-    status = SDWrite(rh->rh.unit, lbn, dta, sendct);
+    status = sd_write(*fpRequest->r_rw_vol_id, lbn, dta, sendct);
+
     if (status != RES_OK)  {
-      if (Debug) cdprintf("SD: write error - status=%d\n", status);
-      rh->rh.status = DONE | ERROR | dos_error(status);
-      return;
+      if (debug) cdprintf("SD: write error - status=%d\n", status);
+      return (S_DONE | S_ERROR | dos_error(status));
     }
+    
     lbn += sendct;
     count -= sendct;
     dta += (sendct*BLOCKSIZE);
   }
-  rh->rh.status = DONE;
+  return (S_DONE);
+}
+
+static uint16_t write_no_verify () {
+    bool verify = FALSE;
+    return write_block(verify);
+}
+
+static uint16_t write_verify () {
+    bool verify = TRUE;
+    return write_block(verify);
 }
 
 
@@ -219,8 +254,8 @@ static driverFunction_t dispatchTable[] =
     NULL,                // 0x05 Non-destructive Read
     NULL,                // 0x06 Input Status
     NULL,                // 0x07 Input Flush
-    write_block,         // 0x08 Output (Write)
-    NULL,                // 0x09 Output with verify
+    write_no_verify,         // 0x08 Output (Write)
+    write_verify,        // 0x09 Output with verify
     NULL,                // 0x0A Output Status
     NULL,                // 0x0B Output Flush
     NULL,                // 0x0C Ioctl Out
@@ -230,7 +265,7 @@ static driverFunction_t dispatchTable[] =
     NULL,                // 0x10 Output till busy
     NULL,                // 0x11 Unused
     NULL,                // 0x12 Unused
-    NULL,       // 0x13 Generic Ioctl
+    NULL,                // 0x13 Generic Ioctl
     NULL,                // 0x14 Unused
     NULL,                // 0x15 Unused
     NULL,                // 0x16 Unused
@@ -252,7 +287,7 @@ void __far DeviceInterrupt( void )
 
     if ( fpRequest->r_command > C_MAXCMD || NULL == (currentFunction = dispatchTable[fpRequest->r_command]) )
     {
-        fpRequest->r_status = S_DONE | S_ERROR | E_CMD;
+        fpRequest->r_status = S_DONE | S_ERROR | E_UNKNOWN_COMMAND;
     }
     else
     {

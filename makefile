@@ -41,13 +41,16 @@ TARGET = parapsd.sys
 
 OBJ =	cstrtsys.obj devinit.obj template.obj cprint.obj sd.obj sdmm.obj
 
+# Libraries
+LIBS = C:\WATCOM\lib286\dos\clibc.lib
+
 all : $(TARGET)
 
 clean : .SYMBOLIC
 	$(RM) $(OBJ) $(TARGET) *.map *.err
 
 $(TARGET) : $(OBJ)
-	$(LD) $(LDFLAGS) NAME $(TARGET) FILE {$(OBJ)}
+	$(LD) $(LDFLAGS) NAME $(TARGET) FILE {$(OBJ)} library { $(LIBS) }
 
 devinit.obj : devinit.c .AUTODEPEND
 	$(CC) $(CFLAGS) -nt=_INIT -nc=INIT -fo=$@ $<

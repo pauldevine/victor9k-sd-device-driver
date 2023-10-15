@@ -30,14 +30,13 @@ void setportbase(uint8_t val);  /* set the port base */
 
 /*---------------------------------------*/
 /* Prototypes for disk control functions */
-#define DOSFAR far
 
 DSTATUS disk_initialize (uint8_t pdrv);
 DSTATUS disk_status (uint8_t pdrv);
 DRESULT disk_result (uint8_t pdrv);
-DRESULT disk_read (uint8_t pdrv, uint8_t DOSFAR * buff, uint32_t sector, uint16_t count);
-DRESULT disk_write (uint8_t pdrv, const uint8_t DOSFAR * buff, uint32_t sector, uint16_t count);
-DRESULT disk_ioctl (uint8_t pdrv, uint8_t cmd, void DOSFAR * buff);
+DRESULT disk_read (uint8_t pdrv, uint8_t far * buff, uint32_t sector, uint16_t count);
+DRESULT disk_write (uint8_t pdrv, const uint8_t far * buff, uint32_t sector, uint16_t count);
+DRESULT disk_ioctl (uint8_t pdrv, uint8_t cmd, void far * buff);
 
 
 /* Disk Status Bits (DSTATUS) */

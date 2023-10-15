@@ -58,7 +58,7 @@ struct ALL_REGS {
 
 extern uint8_t *stack_bottom;
 extern uint32_t dos_stack;
-extern bool debug;
+extern bool debug, init_needed;
 
 extern void switch_stack( void );
 #pragma aux switch_stack = \

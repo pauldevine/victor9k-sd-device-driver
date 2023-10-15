@@ -78,19 +78,20 @@
  *      Error Return Codes
  */
 
-#define E_WRPRT         0       /* Write Protect                */
-#define E_UNIT          1       /* Unknown Unit                 */
-#define E_NOTRDY        2       /* Device Not Ready             */
-#define E_CMD           3       /* Unknown Command              */
-#define E_CRC           4       /* Crc Error                    */
-#define E_LENGTH        5       /* Bad Length                   */
-#define E_SEEK          6       /* Seek Error                   */
-#define E_MEDIA         7       /* Unknown MEDIA                */
-#define E_NOTFND        8       /* Sector Not Found             */
-#define E_PAPER         9       /* No Paper                     */
-#define E_WRITE         10      /* Write Fault                  */
-#define E_READ          11      /* Read Fault                   */
-#define E_FAILURE       12      /* General Failure              */
+#define E_WRITE_PROTECT    0x00    /* Write Protect                */
+#define E_UNKNOWN_UNIT     0x01    /* Unknown Unit                 */
+#define E_NOT_READY        0x02    /* Device Not Ready             */
+#define E_UNKNOWN_COMMAND  0x03    /* Unknown Command              */
+#define E_CRC_ERROR        0x04    /* Crc Error                    */
+#define E_HEADER_LENGTH    0x05    /* Bad Length                   */
+#define E_SEEK_ERROR       0x06    /* Seek Error                   */
+#define E_UNKNOWN_MEDIA    0x07    /* Unknown MEDIA                */
+#define E_SECTOR_NOT_FND   0x08    /* Sector Not Found             */
+#define E_NO_PAPER         0x09    /* No Paper                     */
+#define E_WRITE_FAULT      0x0A    /* Write Fault                  */
+#define E_READ_FAULT       0x0B    /* Read Fault                   */
+#define E_GENERAL_FAILURE  0x0C    /* General Failure              */
+#define E_MEDIA_CHANGED    0x0F    /* invalid diskette change      */
 
 /*
  *      Command codes
@@ -181,8 +182,10 @@ struct dhdr {
 /* BYTE media descriptor                                                */
 /* WORD number of FAT sectors                                           */
 /*                                                                      */
-//realized the above table was written when DOS x2.x was released. I'm going
-//to assume the below table exists in Victor9K DOS 3.1.
+/* realized the above table was written when DOS x2.x was released. I'm going */
+/* to assume the below table exists in Victor9K DOS 3.1.                */
+/* http://www.bitsavers.org/pdf/victor/victor9000/Victor_9000_Systems_Programmers_Tool_Kit_II_Vol_II.pdf */
+/*                                                                      */
 
 #define FAT_NO_MIRRORING 0x80
 
@@ -376,6 +379,45 @@ struct fsinfo {
   uint8_t fi_reserved[12];
 };
 
+/* Victor 9000 IOCTL Get_Disk_Drive_Physical_Info() data structure */
+typedef struct {
+  uint16_t di_ioctl_type;     /* Get_Disk_Drive_Physical_Info() always 0x10h. */
+  uint16_t di_ioctl_status;   /* 0 if successful, 1 if error */
+  uint8_t di_disk_type;       /* 0 = floppy. 1 = hard drive */
+  uint8_t di_disk_location;   /* for floppy only 0 = left, 1 = right drive */
+} v9k_disk_info;
+
+/* 
+  READ or WRITE - ES:BX (Including IOCTL) ->
+  +-------------------------------------+
+  | 13-BYTE Request Header              |
+  +-----——-----—------------------------+
+  | BYTE media descriptor from DPB      |          
+  +-------------------------------------+
+  | DWORD transfer address              |
+  +-------------------------------------+
+  | WORD byte/sector count              |
+  +-------------------------------------+
+  | WORD starting sector number         |
+  | (Ignored on character devices)      |
+  +-------------------------------------+
+*/ 
+
+typedef struct {
+  uint8_t _r_meddesc;           /*  MEDIA Descriptor    */
+  uint8_t __far * _r_trans;     /*  Transfer Address    */
+  uint16_t _r_count;           /*  Byte/Sector Count   */
+  uint16_t _r_start;           /*  Starting Sector No. */
+  uint8_t __far * _r_vol_id;    /* Pointer to volume id */
+  uint32_t _r_huge;             /* for > 32Mb drives    */
+} read_write;
+
+typedef struct {
+  uint8_t _r_media_desc;          /*  MEDIA Descriptor    */
+  uint8_t _r_ret_code;          /*  Return Code         */
+  uint8_t __far * _r_vol_id;        /* volume id */
+} media_check_data;
+
 typedef boot super;             /* Alias for boot structure             */
 
 typedef struct {
@@ -391,30 +433,19 @@ typedef struct {
       bpb *__far * _r_bpbptr;     /*  ptr to BPB array    */
       uint8_t _r_firstunit;
     } _r_init;
-    struct {
-      int8_t _r_meddesc;          /*  MEDIA Descriptor    */
-      int8_t _r_retcode;          /*  Return Code         */
-      int8_t __far * _r_vid;        /* volume id */
-    } _r_media;
+    media_check_data __far * _r_media_ptr;         /* pointer to media_check struct */
     struct {
       int8_t _r_meddesc;          /*  MEDIA Descriptor    */
       boot __far * _r_fat;        /*  boot sector pointer */
       bpb __far * _r_bpbpt;       /*  ptr to BPB table    */
     } _r_bpb;
-    struct {
-      int8_t _r_meddesc;          /*  MEDIA Descriptor    */
-      int8_t __far * _r_trans;      /*  Transfer Address    */
-      uint16_t _r_count;           /*  Byte/Sector Count   */
-      uint16_t _r_start;           /*  Starting Sector No. */
-      int8_t __far * _r_vid;        /* Pointer to volume id */
-      int32_t _r_huge;             /* for > 32Mb drives    */
-    } _r_rw;
+    read_write __far * _r_rw_ptr;           /* pointer to read_write struct */
     struct {
       unsigned char _r_ndbyte;  /*  Byte Read From Device       */
     } _r_nd;
     struct {
-      uint8_t _r_cat;             /* Category code */
-      uint8_t _r_fun;             /* Function code */
+      uint8_t _r_cat;              /* Category code */
+      uint8_t _r_fun;              /* Function code */
       uint16_t _r_si;              /* Contents of SI and DI */
       uint16_t _r_di;              /* (PC DOS 7 Technical Update, pp 104,105) */
       union
@@ -425,18 +456,11 @@ typedef struct {
         struct Gioc_media __far *_r_gioc;
         struct Access_info __far *_r_ai;
         void __far *_r_data;
-      } _r_par;                 /* Pointer to param. block from 440C/440D */
+      } _r_par;                   /* Pointer to param. block from 440C/440D */
     } _r_gen;
+    v9k_disk_info __far *_r_v9k_disk_info_ptr;       /*  ptr to v9k_disk_info    */
   } _r_x;
 } request;
-
-typedef struct {
-      uint16_t ioctl_type;
-      uint16_t ioctl_status;      /* always 0x10h. */
-      uint8_t  disk_type;         /* 0 = floppy. 1 = hard drive */
-      uint8_t  disk_location;     /* for floppy only 0 = left, 1 = right drive */
-} v9k_disk_info;
-
 
 #define HUGECOUNT       0xffff
 #define MAXSHORT        0xffffl
@@ -452,9 +476,10 @@ typedef struct {
 #define r_firstunit     _r_x._r_init._r_firstunit
 
 /* MEDIA Check packet macros                                            */
-#define r_mcmdesc       _r_x._r_media._r_meddesc
-#define r_mcretcode     _r_x._r_media._r_retcode
-#define r_mcvid         _r_x._r_media._r_vid
+#define r_media_check   _r_x._r_media_ptr
+#define r_mc_media_desc _r_x._r_media_ptr->_r_media_desc
+#define r_mc_ret_code   _r_x._r_media_ptr->_r_ret_code
+#define r_mc_vol_id     _r_x._r_media_ptr->_r_vol_id
 
 /* Build BPB packet macros                                              */
 #define r_bpmdesc       _r_x._r_bpb._r_meddesc
@@ -462,12 +487,13 @@ typedef struct {
 #define r_bpptr         _r_x._r_bpb._r_bpbpt
 
 /* rw packet macros                                                     */
-#define r_meddesc       _r_x._r_rw._r_meddesc
-#define r_trans         _r_x._r_rw._r_trans
-#define r_count         _r_x._r_rw._r_count
-#define r_start         _r_x._r_rw._r_start
-#define r_rwvid         _r_x._r_rw._r_vid
-#define r_huge          _r_x._r_rw._r_huge
+#define r_rw_ptr        _r_x._r_rw_ptr
+#define r_meddesc       _r_x._r_rw_ptr->_r_meddesc
+#define r_trans         _r_x._r_rw_ptr->_r_trans
+#define r_count         _r_x._r_rw_ptr->_r_count
+#define r_start         _r_x._r_rw_ptr->_r_start
+#define r_rw_vol_id     _r_x._r_rw_ptr->_r_vol_id
+#define r_huge          _r_x._r_rw_ptr->_r_huge
 
 /* ndread packet macros                                                 */
 #define r_ndbyte        _r_x._r_nd._r_ndbyte
@@ -484,14 +510,23 @@ typedef struct {
 #define r_ai            _r_x._r_gen._r_par._r_ai
 #define r_data          _r_x._r_gen._r_par._r_data
 
+
+/* Build Victor 9k IOCTL macros                                         */
+#define r_v9k_disk_info_ptr _r_x._r_v9k_disk_info_ptr        
+#define r_di_ioctl_type _r_x._r_v9k_disk_info_ptr->di_ioctl_type
+#define r_di_ioctl_status _r_x._r_v9k_disk_info_ptr->di_ioctl_status
+#define r_di_disk_type _r_x._r_v9k_disk_info_ptr->di_disk_type
+#define r_di_disk_location _r_x._r_v9k_disk_info_ptr->di_disk_location
+
+
 /*
  *interrupt support (spl & splx) support - IBM style
  */
 
-#define I_NONE          0       /* Initial value                */
+#define I_NONE          0       /* Initial value                        */
 
 /* predefined interrupt levels - 8259 support                           */
-#define IRQ0            0x01    /* Level 0 - highest            */
+#define IRQ0            0x01    /* Level 0 - highest                    */
 #define IRQ1            0x02
 #define IRQ2            0x04
 #define IRQ3            0x08

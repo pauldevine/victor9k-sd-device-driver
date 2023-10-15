@@ -90,6 +90,7 @@ static volatile V9kParallelPort far *via2 = MK_FP(PHASE2_DEVICE_SEGMENT,
 #define CS_INIT()
 
 static bool via_initialized;
+extern bool init_needed;
 const int bit_delay_us = 175;
 
 
@@ -183,6 +184,7 @@ void par_port_init(void) {
    STATUSPORT=&via1->out_in_reg_b;
    CONTROLPORT=&via1->out_in_reg_b;
    via_initialized = true;
+   init_needed = false;
 
    cdprintf("Finished via_initialized, cycling bits\n");
    //say hello
@@ -387,7 +389,7 @@ uint8_t CardType;       /* b0:MMC, b1:SDv1, b2:SDv2, b3:Block addressing */
 
 static
 void xmit_mmc (
-   const uint8_t DOSFAR * buff, /* Data to be sent */
+   const uint8_t far * buff, /* Data to be sent */
    uint16_t bc                  /* Number of bytes to send */
 )
 {
@@ -448,7 +450,7 @@ void xmit_mmc (
 
 static
 void rcvr_mmc (
-   uint8_t DOSFAR *buff, /* Pointer to read buffer */
+   uint8_t far *buff, /* Pointer to read buffer */
    uint16_t bc            /* Number of bytes to receive */
 )
 {
@@ -572,7 +574,7 @@ int select (void) /* 1:OK, 0:Timeout */
 
 static
 int rcvr_datablock ( /* 1:OK, 0:Failed */
-   uint8_t DOSFAR *buff,       /* Data buffer to store received data */
+   uint8_t far *buff,       /* Data buffer to store received data */
    uint16_t btr                 /* Byte count */
 )
 {
@@ -603,7 +605,7 @@ int rcvr_datablock ( /* 1:OK, 0:Failed */
 
 static
 int xmit_datablock ( /* 1:OK, 0:Failed */
-   const uint8_t DOSFAR *buff, /* 512 byte data block to be transmitted */
+   const uint8_t far *buff, /* 512 byte data block to be transmitted */
    uint8_t token               /* Data/Stop token */
 )
 {
@@ -817,7 +819,7 @@ DSTATUS disk_initialize (uint8_t drv)
 
 DRESULT disk_read (
    uint8_t drv,            /* Physical drive nmuber (0) */
-   uint8_t DOSFAR *buff,   /* Pointer to the data buffer to store read data */
+   uint8_t far *buff,   /* Pointer to the data buffer to store read data */
    uint32_t sector,        /* Start sector number (LBA) */
    uint16_t count           /* Sector count (1..128) */
 )
@@ -854,7 +856,7 @@ DRESULT disk_read (
 
 DRESULT disk_write (
    uint8_t drv,                /* Physical drive nmuber (0) */
-   const uint8_t DOSFAR *buff, /* Pointer to the data to be written */
+   const uint8_t far *buff, /* Pointer to the data to be written */
    uint32_t sector,            /* Start sector number (LBA) */
    uint16_t count               /* Sector count (1..128) */
 )
@@ -894,7 +896,7 @@ DRESULT disk_write (
 DRESULT disk_ioctl (
    uint8_t drv,             /* Physical drive nmuber (0) */
    uint8_t ctrl,            /* Control code */
-   void DOSFAR *buff     /* Buffer to send/receive control data */
+   void far *buff     /* Buffer to send/receive control data */
 )
 {
    DRESULT res;
@@ -913,18 +915,18 @@ DRESULT disk_ioctl (
          if ((send_cmd(CMD9, 0) == 0) && rcvr_datablock(csd, 16)) {
             if ((csd[0] >> 6) == 1) {  /* SDC ver 2.00 */
                cs = csd[9] + ((uint16_t)csd[8] << 8) + ((uint32_t)(csd[7] & 63) << 16) + 1;
-               *(uint32_t DOSFAR *)buff = uint32_tLSHIFT(cs,10);
+               *(uint32_t far *)buff = uint32_tLSHIFT(cs,10);
             } else {             /* SDC ver 1.XX or MMC */
                n = (csd[5] & 15) + ((csd[10] & 128) >> 7) + ((csd[9] & 3) << 1) + 2;
                cs = (csd[8] >> 6) + ((uint16_t)csd[7] << 2) + ((uint16_t)(csd[6] & 3) << 10) + 1;
-               *(uint32_t DOSFAR *)buff = uint32_tLSHIFT(cs,n-9);
+               *(uint32_t far *)buff = uint32_tLSHIFT(cs,n-9);
             }
             res = RES_OK;
          }
          break;
 
       case GET_BLOCK_SIZE :   /* Get erase block size in unit of sector (uint32_t) */
-         *(uint32_t DOSFAR *)buff = 128;
+         *(uint32_t far *)buff = 128;
          res = RES_OK;
          break;
 
