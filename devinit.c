@@ -119,7 +119,8 @@ uint16_t device_init( void )
     /* Parse the options from the CONFIG.SYS file, if any... */
     if (!parse_options((char far *) bpb_cast_ptr)) {
         cdprintf("SD: bad options in CONFIG.SYS\n");
-        goto unload2;   
+        fpRequest->r_endaddr = MK_FP( getCS(), 0 );
+        return (S_DONE | S_ERROR | E_UNKNOWN_MEDIA ); 
     }
     cdprintf("done parsing bpb_ptr: %x\n", bpb_ptr);
 
@@ -127,7 +128,8 @@ uint16_t device_init( void )
     if (debug) cdprintf("SD: initializing drive\n");
     if (!sd_initialize(fpRequest->r_unit, partition_number, bpb_ptr))    {
         cdprintf("SD: drive not connected or not powered\n");
-        goto unload1;
+        //fpRequest->r_endaddr = MK_FP( getCS(), 0 );
+        return (S_DONE );
     }
     cdprintf("SD: bpb_ptr = %4x:%4x\n", FP_SEG(bpb_ptr), FP_OFF(bpb_ptr));
 
@@ -150,18 +152,11 @@ uint16_t device_init( void )
       cdprintf("Hidden sectors: %d  ", bpb_ptr->bpb_hidden);
       cdprintf("Hidden sectors 32 hex: %L\n", bpb_ptr->bpb_hidden);
       cdprintf("Size in sectors if : %L\n", bpb_ptr->bpb_huge);
-  }
-  return 0;
+    }
+    Enable(); 
+    fpRequest->r_endaddr = MK_FP(getCS(), &transient_data);
 
-  /*   We get here if there are any errors in initialization.  In that  */
-  /* case we can unload this driver completely from memory by setting   */
-  /* (1) the break address to the starting address, (2) the number of   */
-  /* units to 0, and (3) the error flag.           */
-  unload1:
-  { };
-  unload2:
-    fpRequest->r_endaddr = MK_FP( getCS(), 0 );
-    return 0;
+  return S_DONE;    
 }
 
 /* iseol - return TRUE if ch is any end of line character */

@@ -182,7 +182,7 @@ static uint16_t read_block (void)
 
       if (status != RES_OK)  {
         if (debug) cdprintf("SD: read error - status=%d\n", status);
-        _fmemset(dta, 0, BLOCKSIZE);
+        //_fmemset(dta, 0, BLOCKSIZE);
         return (S_DONE | S_ERROR | dos_error(status));
       }
 
@@ -225,7 +225,7 @@ static uint16_t write_block (bool verify)
       if (debug) cdprintf("SD: write error - status=%d\n", status);
       return (S_DONE | S_ERROR | dos_error(status));
     }
-    
+
     lbn += sendct;
     count -= sendct;
     dta += (sendct*BLOCKSIZE);
@@ -249,13 +249,13 @@ static driverFunction_t dispatchTable[] =
     device_init,         // 0x00 Initialize
     media_check,         // 0x01 MEDIA Check
     build_bpb,           // 0x02 Build BPB
-    IOCTL_input,         // 0x03 Ioctl In
-    read_block,          // 0x04 Input (Read)
+    NULL,         // 0x03 Ioctl In
+    NULL,          // 0x04 Input (Read)
     NULL,                // 0x05 Non-destructive Read
     NULL,                // 0x06 Input Status
     NULL,                // 0x07 Input Flush
-    write_no_verify,         // 0x08 Output (Write)
-    write_verify,        // 0x09 Output with verify
+    NULL,         // 0x08 Output (Write)
+    NULL,        // 0x09 Output with verify
     NULL,                // 0x0A Output Status
     NULL,                // 0x0B Output Flush
     NULL,                // 0x0C Ioctl Out

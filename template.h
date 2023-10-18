@@ -141,6 +141,12 @@ extern void printMsg( const char * );
     __parm [__dx]             \
     __modify [__ax __di __es];
 
+extern void Enable( void );
+#pragma aux Enable = \
+    "sti" \
+    parm [] \
+    modify [];
+
 typedef uint16_t (*driverFunction_t)(void);
 
 extern request __far *fpRequest;

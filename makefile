@@ -25,7 +25,7 @@ CC = wcc
 AS = wasm
 LD = wlink
 RM = rm -f
-CFLAGS  = -0 -bt=dos -ms -q -s -osh
+CFLAGS  = -0 -bt=dos -ms -q -s -osh -za99
 ASFLAGS = -bt=DOS -zq -mt -0
 LDFLAGS =	SYSTEM dos &
 			ORDER clname HEADER clname DATA clname CODE clname BSS clname INIT &
@@ -41,16 +41,13 @@ TARGET = parapsd.sys
 
 OBJ =	cstrtsys.obj devinit.obj template.obj cprint.obj sd.obj sdmm.obj
 
-# Libraries
-LIBS = C:\WATCOM\lib286\dos\clibc.lib
-
 all : $(TARGET)
 
 clean : .SYMBOLIC
 	$(RM) $(OBJ) $(TARGET) *.map *.err
 
 $(TARGET) : $(OBJ)
-	$(LD) $(LDFLAGS) NAME $(TARGET) FILE {$(OBJ)} library { $(LIBS) }
+	$(LD) $(LDFLAGS) NAME $(TARGET) FILE {$(OBJ)}
 
 devinit.obj : devinit.c .AUTODEPEND
 	$(CC) $(CFLAGS) -nt=_INIT -nc=INIT -fo=$@ $<
