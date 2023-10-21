@@ -119,7 +119,7 @@ uint16_t device_init( void )
     /* Parse the options from the CONFIG.SYS file, if any... */
     if (!parse_options((char far *) bpb_cast_ptr)) {
         cdprintf("SD: bad options in CONFIG.SYS\n");
-        fpRequest->r_endaddr = MK_FP( getCS(), 0 );
+        //fpRequest->r_endaddr = MK_FP( getCS(), 0 );
         return (S_DONE | S_ERROR | E_UNKNOWN_MEDIA ); 
     }
     cdprintf("done parsing bpb_ptr: %x\n", bpb_ptr);
@@ -128,8 +128,9 @@ uint16_t device_init( void )
     if (debug) cdprintf("SD: initializing drive\n");
     if (!sd_initialize(fpRequest->r_unit, partition_number, bpb_ptr))    {
         cdprintf("SD: drive not connected or not powered\n");
+        printMsg(hellomsg);
         //fpRequest->r_endaddr = MK_FP( getCS(), 0 );
-        return (S_DONE );
+        return (S_DONE | S_ERROR | E_NOT_READY ); 
     }
     cdprintf("SD: bpb_ptr = %4x:%4x\n", FP_SEG(bpb_ptr), FP_OFF(bpb_ptr));
 

@@ -234,13 +234,11 @@ static uint16_t write_block (bool verify)
 }
 
 static uint16_t write_no_verify () {
-    bool verify = FALSE;
-    return write_block(verify);
+    return write_block(FALSE);
 }
 
 static uint16_t write_verify () {
-    bool verify = TRUE;
-    return write_block(verify);
+    return write_block(TRUE);
 }
 
 
@@ -249,13 +247,13 @@ static driverFunction_t dispatchTable[] =
     device_init,         // 0x00 Initialize
     media_check,         // 0x01 MEDIA Check
     build_bpb,           // 0x02 Build BPB
-    NULL,         // 0x03 Ioctl In
-    NULL,          // 0x04 Input (Read)
+    IOCTL_input,         // 0x03 Ioctl In
+    read_block,          // 0x04 Input (Read)
     NULL,                // 0x05 Non-destructive Read
     NULL,                // 0x06 Input Status
     NULL,                // 0x07 Input Flush
-    NULL,         // 0x08 Output (Write)
-    NULL,        // 0x09 Output with verify
+    write_no_verify,     // 0x08 Output (Write)
+    write_verify,        // 0x09 Output with verify
     NULL,                // 0x0A Output Status
     NULL,                // 0x0B Output Flush
     NULL,                // 0x0C Ioctl Out
