@@ -59,6 +59,9 @@ struct ALL_REGS {
 extern uint8_t *stack_bottom;
 extern uint32_t dos_stack;
 extern bool debug, init_needed;
+extern int8_t my_units[9];
+extern request __far *fpRequest;
+extern struct device_header far *dev_header;
 
 extern void switch_stack( void );
 #pragma aux switch_stack = \
@@ -148,7 +151,5 @@ extern void Enable( void );
     modify [];
 
 typedef uint16_t (*driverFunction_t)(void);
-
-extern request __far *fpRequest;
 
 #endif /* _TEMPLATE_H_ */

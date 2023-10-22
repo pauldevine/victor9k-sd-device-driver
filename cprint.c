@@ -77,13 +77,12 @@ unsigned short get_cursor_position() {
 }
 
 void newline() {
-    unsigned short cursor_address = get_cursor_position();
-    unsigned short screen_words = SCREEN_WIDTH * 2;   //each char is ASCII value + styling
+    uint16_t cursor_address = get_cursor_position();
+    uint8_t screen_words = SCREEN_WIDTH * 2;   //each char is ASCII value + styling
 
     // Calculate remaining words to fill in current line
-    unsigned short words_to_end = screen_words - (cursor_address % screen_words);
-    int i;
-    for (i = 0; i < words_to_end; i += 2) {
+    uint16_t words_to_end = screen_words - (cursor_address % screen_words);
+    for (int i = 0; i < words_to_end; i += 2) {
         outchr(' ');
     }
 }
@@ -105,12 +104,16 @@ unsigned short calculate_font_cell_start(char ch)
 /* outchr - print a single ASCII character */
 void outchr (char ch)
 {
-  unsigned short cursor_address = get_cursor_position();
-  unsigned short volatile far *absolute_cursor_address = MK_FP(SCREEN_BUFFER_SEGMENT, cursor_address);
+  uint16_t cursor_address = get_cursor_position();
+  if (cursor_address >= 0xF00) {
+      set_cursor_position(0x0);
+      cursor_address = get_cursor_position();
+  }
+  uint16_t volatile far *absolute_cursor_address = MK_FP(SCREEN_BUFFER_SEGMENT, cursor_address);
 
   //glyph_pointer = display_attributes | ASCII + character_table_offset
-  unsigned short glyph_pointer = calculate_font_cell_start(ch); //locate the glyph for the char in the font area of RAM
-  unsigned short word = ((0x08 << 8) | glyph_pointer);  // convert the char to the format used in the screen buffer (char + attribute byte)
+  uint16_t glyph_pointer = calculate_font_cell_start(ch); //locate the glyph for the char in the font area of RAM
+  uint16_t word = ((0x40 << 8) | glyph_pointer);  // convert the char to the format used in the screen buffer (attribute byte + char)
   *absolute_cursor_address = word;
   
   //increment cursor location
@@ -169,16 +172,7 @@ void outlhex (uint16_t lval)
 /* outcrlf - print a carriage return, line feed pair */
 void outcrlf (void)
 {
-  unsigned short cursor_address = get_cursor_position();
-  char screen_words = SCREEN_WIDTH * 2;   //each char is ASCII value + styling
-
-  // Calculate remaining words to fill in current line
-  unsigned short words_to_end = screen_words - (cursor_address % screen_words);
-  int i;
-  for (i = 0; i < words_to_end; i += 2) 
-  {
-      outchr(' ');
-  }
+  newline();
 }
 
 void cdprint(const char* str) {
@@ -213,7 +207,7 @@ void cdprintf (char near *msg, ...)
   va_start (ap, msg);
 
   while (*msg != '\0') {
-    //outhex((unsigned) msg, 4);  outchr('=');  outhex(*msg, 2);  outchr(' ');
+    //outhex((unsigned) msg, 4);  put_char_direct('=');  outhex(*msg, 2);  put_char_direct(' ');
     if (*msg == '%') {
       ++msg;  
       size = 0;
@@ -248,7 +242,7 @@ void cdprintf (char near *msg, ...)
         ++msg;
       }
     } else if (*msg == '\n') {
-      newline();  
+      newline(0xC80);  
       ++msg;
     } else {
       outchr(*msg);  

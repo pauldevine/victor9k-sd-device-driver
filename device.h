@@ -144,12 +144,11 @@
 
 /* Device header */
 
-struct dhdr {
-  struct dhdr
-  __far *dh_next;
+struct device_header {
+  struct device_header __far *dh_next;
   uint16_t dh_attr;
-    void(*dh_strategy) (void);
-    void(*dh_interrupt) (void);
+  void(*dh_strategy) (void);
+  void(*dh_interrupt) (void);
   uint8_t dh_name[8];
 };
 

@@ -39,7 +39,7 @@ CFLAGS += -zu
 
 TARGET = parapsd.sys
 
-OBJ =	cstrtsys.obj devinit.obj template.obj cprint.obj sd.obj sdmm.obj
+OBJ =	cstrtsys.obj template.obj cprint.obj sd.obj sdmm.obj devinit.obj
 
 all : $(TARGET)
 

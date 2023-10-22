@@ -38,6 +38,7 @@ static uint8_t our_stack[STACK_SIZE];
 uint8_t *stack_bottom = our_stack + STACK_SIZE;
 uint32_t dos_stack;
 bool init_needed = TRUE;
+int8_t my_units[9] = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
 
 #endif // USE_INTERNAL_STACK
 
@@ -241,6 +242,17 @@ static uint16_t write_verify () {
     return write_block(TRUE);
 }
 
+static bool is_my_unit(int8_t unitCode) {
+  for (int i = 0; i < sizeof(my_units); ++i) {
+    if (my_units[i] == -1) {
+      break;  // End of valid unit codes in the array
+    }
+    if (my_units[i] == unitCode) {
+      return true;  // This unit code is for my driver
+    }
+  }
+  return false;  // This unit code is not for my driver
+}
 
 static driverFunction_t dispatchTable[] =
 {
@@ -289,7 +301,15 @@ void __far DeviceInterrupt( void )
     }
     else
     {
-        fpRequest->r_status = currentFunction();
+        cdprintf("SD: command: %d r_unit: %d\n", fpRequest->r_command, fpRequest->r_unit);
+        if ((fpRequest->r_command == C_INIT) || is_my_unit(fpRequest->r_unit)) {
+            fpRequest->r_status = currentFunction();
+        } else {
+            // This is  not for me to handle
+            struct device_header __far *deviceHeader = MK_FP(getCS(), 0);
+            struct device_header __far *nextDeviceHeader = deviceHeader->dh_next;
+            nextDeviceHeader->dh_interrupt();
+        }
     }
 
     pop_regs();
@@ -303,5 +323,21 @@ void __far DeviceStrategy( request __far *req )
 #pragma aux DeviceStrategy __parm [__es __bx]
 {
     fpRequest = req;
+
+    // struct ALL_REGS registers;
+    // get_all_registers(&registers);
+
+    // struct device_header __far *deviceHeader = MK_FP(registers.cs, 0);
+    // fpRequest = MK_FP(registers.es, registers.bx);
+
+    // cdprintf("SD: command: %d r_unit: %d\n", req->r_command, req->r_unit);
+    // cdprintf("SD: dh_name: %s\n", deviceHeader->dh_name);
+    // cdprintf("SD: dh_next: %x\n", deviceHeader->dh_next);
+    // if ( ! is_my_unit(req->r_unit)) {
+    //     // This is  not for me to handle
+    //     struct device_header __far *nextDeviceHeader = deviceHeader->dh_next;
+    //     nextDeviceHeader->dh_strategy();
+    // }
+
 }
 

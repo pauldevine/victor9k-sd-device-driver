@@ -65,7 +65,6 @@ static uint8_t partition_number;
 // Place here any variables or constants that should go away after initialization
 //
 static char hellomsg[] = "\r\nDOS Device Driver Template in Open Watcom C\r\n$";
-static char test_message[] = "Test message\n";
 
 /*   WARNING!!  WARNING!!  WARNING!!  WARNING!!  WARNING!!  WARNING!!   */
 /*                         */
@@ -95,19 +94,23 @@ uint16_t device_init( void )
     void (__interrupt far *reboot_address)();  /* Reboot vector */
     bpb far *bpb_ptr;
     char far *bpb_cast_ptr;
+    uint8_t i;
 
     get_all_registers(&registers);
 
     fpRequest->r_endaddr = MK_FP(registers.cs, &transient_data);
+    struct device_header far *dev_header = MK_FP(registers.cs, 0);
 
     cdprintf("\nSD pport device driver v0.1 (C) 2023 by Paul Devine\n");
-    cdprintf("     based on (C) 2014 by Dan Marks");
-    cdprintf(" and on TU58 by Robert Armstrong\n");
-    cdprintf(".    with help from an openwatcom driver by Eduardo Casino\n");
+    cdprintf("     based on (C) 2014 by Dan Marks and on TU58 by Robert Armstrong\n");
+    cdprintf("     with help from an openwatcom driver by Eduardo Casino\n");
 
     //address to find passed by DOS in a combo of ES / BX registers
     
     cdprintf("about to parse bpb, ES: %x BX: %x\n", registers.es, registers.bx);
+    cdprintf("SD: command: %d r_unit: %d\n", fpRequest->r_command, fpRequest->r_unit);
+    cdprintf("SD: dh_name: %s\n", dev_header->dh_name);
+    cdprintf("SD: dh_next: %x\n", dev_header->dh_next);
 
     //DOS is overloading a data structure that in normal use stores the BPB, 
     //for init() it stores the string that sits in config.sys
@@ -136,6 +139,9 @@ uint16_t device_init( void )
 
     // /* All is well.  Tell DOS how many units and the BPBs... */
     cdprintf("SD initialized on DOS drive %c\n",(fpRequest->r_firstunit + 'A'));
+    for (i=0; i < fpRequest->r_nunits; i++) {
+        my_units[i] = fpRequest->r_firstunit + i;
+    }
 
     if (debug)
     {   
