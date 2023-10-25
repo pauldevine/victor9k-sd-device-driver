@@ -37,11 +37,11 @@
 static uint8_t our_stack[STACK_SIZE];
 uint8_t *stack_bottom = our_stack + STACK_SIZE;
 uint32_t dos_stack;
-bool init_needed = TRUE;
-int8_t my_units[9] = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
 
 #endif // USE_INTERNAL_STACK
 
+bool init_needed = TRUE;
+int8_t my_units[9] = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
 request __far *fpRequest = (request __far *)0;
 
 static uint16_t open( void )
