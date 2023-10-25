@@ -40,6 +40,7 @@ uint32_t dos_stack;
 bool init_needed = TRUE;
 int8_t my_units[9] = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
 
+
 #endif // USE_INTERNAL_STACK
 
 request __far *fpRequest = (request __far *)0;

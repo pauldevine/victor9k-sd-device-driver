@@ -29,7 +29,8 @@ CFLAGS  = -0 -bt=dos -ms -q -s -osh -za99
 ASFLAGS = -bt=DOS -zq -mt -0
 LDFLAGS =	SYSTEM dos &
 			ORDER clname HEADER clname DATA clname CODE clname BSS clname INIT &
-			DISABLE 1014 OPTION QUIET, STATICS, MAP=parap-sd.map
+			DISABLE 1014 OPTION QUIET, STATICS, MAP=parap-sd.map &
+			LIBPATH C:\WATCOM\lib286\dos LIBRARY clibs.lib
 
 !ifdef USE_INTERNAL_STACK
 CFLAGS += -DUSE_INTERNAL_STACK -DSTACK_SIZE=300

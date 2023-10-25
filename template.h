@@ -150,6 +150,7 @@ extern void Enable( void );
     parm [] \
     modify [];
 
+
 typedef uint16_t (*driverFunction_t)(void);
 
 #endif /* _TEMPLATE_H_ */

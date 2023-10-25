@@ -105,12 +105,21 @@ uint16_t device_init( void )
     cdprintf("     based on (C) 2014 by Dan Marks and on TU58 by Robert Armstrong\n");
     cdprintf("     with help from an openwatcom driver by Eduardo Casino\n");
 
+
     //address to find passed by DOS in a combo of ES / BX registers
     
     cdprintf("about to parse bpb, ES: %x BX: %x\n", registers.es, registers.bx);
     cdprintf("SD: command: %d r_unit: %d\n", fpRequest->r_command, fpRequest->r_unit);
-    cdprintf("SD: dh_name: %s\n", dev_header->dh_name);
+    cdprintf("SD: dh_num_drives: %d\n", dev_header->dh_num_drives);
+    char name_buffer[8];  // 7 bytes for the name + 1 byte for the null terminator
+    memcpy(name_buffer, (void const *) dev_header->dh_name, 7);
+    name_buffer[7] = '\0';
+    cdprintf("SD: dh_name: %s\n", name_buffer);
     cdprintf("SD: dh_next: %x\n", dev_header->dh_next);
+    //setting unit count to 1 to make DOS happy
+    dev_header->dh_num_drives = 1;
+    fpRequest->r_nunits = 1;
+    cdprintf("SD: dh_num_drives: %x r_unit: %x\n", dev_header->dh_num_drives, fpRequest->r_unit);
 
     //DOS is overloading a data structure that in normal use stores the BPB, 
     //for init() it stores the string that sits in config.sys
@@ -127,14 +136,34 @@ uint16_t device_init( void )
     }
     cdprintf("done parsing bpb_ptr: %x\n", bpb_ptr);
 
-    /* Try to make contact with the drive... */
-    if (debug) cdprintf("SD: initializing drive\n");
-    if (!sd_initialize(fpRequest->r_unit, partition_number, bpb_ptr))    {
-        cdprintf("SD: drive not connected or not powered\n");
-        printMsg(hellomsg);
-        //fpRequest->r_endaddr = MK_FP( getCS(), 0 );
-        return (S_DONE | S_ERROR | E_NOT_READY ); 
+    if (true) {
+        cdprintf("SD: ramdrive allocation succeeded. Total Size: %dKB\n", sizeof(my_drive.sectors));
+    } else {
+        cdprintf("SD: ramdrive allocation failed.\n");
     }
+
+    // /* Try to make contact with the drive... */
+    // if (debug) cdprintf("SD: initializing drive\n");
+    // if (!sd_initialize(fpRequest->r_unit, partition_number, bpb_ptr))    {
+    //     cdprintf("SD: drive not connected or not powered\n");
+    //     printMsg(hellomsg);
+    //     //fpRequest->r_endaddr = MK_FP( getCS(), 0 );
+    //     return (S_DONE | S_ERROR | E_NOT_READY ); 
+    // }
+
+    bpb_ptr->bpb_nbyte = SECTOR_SIZE;
+    bpb_ptr->bpb_nsector = 1;     /* Number of sectors per cluster */
+    bpb_ptr->bpb_nreserved = 2;  /* Number of reserved sectors */
+    bpb_ptr->bpb_nfat = 2;              /* Number of FAT copies */
+    bpb_ptr->bpb_ndirent = 512;   
+    bpb_ptr->bpb_nsize = 32;
+    bpb_ptr->bpb_mdesc = 0xF8;
+    bpb_ptr->bpb_nfsect = 243;             /* Number of sectors per FAT */
+    bpb_ptr->bpb_nsecs = 32;     /* Number of sectors per track */
+    bpb_ptr->bpb_nheads = 255;     /* Number of heads */
+    bpb_ptr->bpb_hidden = 1;
+    bpb_ptr->bpb_huge = 0;
+
     cdprintf("SD: bpb_ptr = %4x:%4x\n", FP_SEG(bpb_ptr), FP_OFF(bpb_ptr));
 
     // /* All is well.  Tell DOS how many units and the BPBs... */
@@ -161,6 +190,7 @@ uint16_t device_init( void )
       cdprintf("Size in sectors if : %L\n", bpb_ptr->bpb_huge);
     }
     Enable(); 
+
     fpRequest->r_endaddr = MK_FP(getCS(), &transient_data);
 
   return S_DONE;    
@@ -245,3 +275,5 @@ bool parse_options (char far *p)
 }
 return TRUE;
 }
+
+

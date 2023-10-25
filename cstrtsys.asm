@@ -42,8 +42,8 @@ ATTR_CONIN      equ     00001h
 ; Device name and attributes. Modify according to your needs
 ;
 
-DEVICE_NAME     equ     'PARAPSD$'
-DEVICE_ATTR     equ     ATTR_EXCALLS or ATTR_GENIOCTL
+DEVICE_NAME     equ     'PARAPSD'
+DEVICE_ATTR     equ     ATTR_GENIOCTL or ATTR_IOCTL or ATTR_QRYIOCTL
 
 ; End of user modifiable part
 
@@ -81,6 +81,7 @@ _cstart_ label near
         dw      DEVICE_ATTR
         dw      DeviceStrategy_
         dw      DeviceInterrupt_
+        db      1                       ; number of drives
         db      DEVICE_NAME
 
 _HEADER ends

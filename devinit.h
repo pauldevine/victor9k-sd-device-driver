@@ -29,4 +29,20 @@ extern int8_t my_units[9];
 extern uint16_t device_init( void );
 extern struct device_header far *dev_header;
 
+//used for RAMdrive version
+extern int alloc_memory(uint16_t paragraphs, uint16_t *segment);
+#pragma aux alloc_memory =    \
+    "mov dx, 1"               \
+    "mov ah, 0x48"            \
+    "int 0x21"                \
+    "jc allocation_failed"    \
+    "jmp allocation_ok"       \
+    "allocation_failed:"      \
+    "xor dx, dx"              \
+    "allocation_ok:"          \
+    "mov [si], ax"            \
+    parm [bx] [si]            \
+    value [dx]                \
+    modify [ax dx];
+
 #endif /* _DEVINIT_H_ */
