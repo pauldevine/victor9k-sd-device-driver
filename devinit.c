@@ -105,11 +105,16 @@ uint16_t device_init( void )
     cdprintf("     based on (C) 2014 by Dan Marks and on TU58 by Robert Armstrong\n");
     cdprintf("     with help from an openwatcom driver by Eduardo Casino\n");
 
+
     //address to find passed by DOS in a combo of ES / BX registers
     
     cdprintf("about to parse bpb, ES: %x BX: %x\n", registers.es, registers.bx);
     cdprintf("SD: command: %d r_unit: %d\n", fpRequest->r_command, fpRequest->r_unit);
-    cdprintf("SD: dh_name: %s\n", dev_header->dh_name);
+    cdprintf("SD: dh_num_drives: %d\n", dev_header->dh_num_drives);
+    char name_buffer[8];  // 7 bytes for the name + 1 byte for the null terminator
+    memcpy(name_buffer, (void const *) dev_header->dh_name, 7);
+    name_buffer[7] = '\0';
+    cdprintf("SD: dh_name: %s\n", name_buffer);
     cdprintf("SD: dh_next: %x\n", dev_header->dh_next);
 
     //DOS is overloading a data structure that in normal use stores the BPB, 
@@ -135,6 +140,9 @@ uint16_t device_init( void )
         //fpRequest->r_endaddr = MK_FP( getCS(), 0 );
         return (S_DONE | S_ERROR | E_NOT_READY ); 
     }
+    fpRequest->r_nunits = 1;         //tell DOS how many drives we're instantiating.
+    cdprintf("SD: dh_num_drives: %x r_unit: %x\n", dev_header->dh_num_drives, fpRequest->r_unit);
+
     cdprintf("SD: bpb_ptr = %4x:%4x\n", FP_SEG(bpb_ptr), FP_OFF(bpb_ptr));
 
     // /* All is well.  Tell DOS how many units and the BPBs... */
@@ -161,6 +169,7 @@ uint16_t device_init( void )
       cdprintf("Size in sectors if : %L\n", bpb_ptr->bpb_huge);
     }
     Enable(); 
+
     fpRequest->r_endaddr = MK_FP(getCS(), &transient_data);
 
   return S_DONE;    
@@ -245,3 +254,5 @@ bool parse_options (char far *p)
 }
 return TRUE;
 }
+
+
