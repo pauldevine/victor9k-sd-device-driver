@@ -147,9 +147,10 @@
 struct device_header {
   struct device_header __far *dh_next;
   uint16_t dh_attr;
-  void(*dh_strategy) (void);
-  void(*dh_interrupt) (void);
-  uint8_t dh_name[8];
+  void(near *dh_strategy) (void);
+  void(near *dh_interrupt) (void);
+  uint8_t dh_num_drives;
+  uint8_t dh_name[7];
 };
 
 #define ATTR_SUBST      0x8000
@@ -572,6 +573,25 @@ typedef struct dhdr __far *dhdrptr;
 #pragma pack( pop )
 
 static bool parse_options (char far *);
+
+#define SECTOR_SIZE 512                         // sector size in bytes
+#define MAX_RAM_DISK_SIZE_KB 768
+#define MAX_SECTORS_POSSIBLE (MAX_RAM_DISK_SIZE_KB * 1024 / SECTOR_SIZE) //768KB * 1024 / 512 = 1536
+#define MAX_SEGMENTS (MAX_RAM_DISK_SIZE_KB / 64) //64KB segments allocatable by DOS
+
+#define NUM_SECTORS 32
+
+typedef struct {
+    uint8_t data[SECTOR_SIZE];
+} Sector;
+
+typedef struct {
+    Sector sectors[NUM_SECTORS];
+} MiniDrive;
+
+MiniDrive my_drive;
+
+
 
 #endif /* _DEVICE_H_ */
 /*
