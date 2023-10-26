@@ -43,7 +43,7 @@ ATTR_CONIN      equ     00001h
 ;
 
 DEVICE_NAME     equ     'PARAPSD'
-DEVICE_ATTR     equ     ATTR_GENIOCTL or ATTR_IOCTL or ATTR_QRYIOCTL
+DEVICE_ATTR     equ     ATTR_BLDFAT or ATTR_GENIOCTL or ATTR_IOCTL or ATTR_QRYIOCTL
 
 ; End of user modifiable part
 
