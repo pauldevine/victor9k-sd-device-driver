@@ -333,11 +333,7 @@ void __far DeviceStrategy( request __far *req )
     // cdprintf("SD: command: %d r_unit: %d\n", req->r_command, req->r_unit);
     // cdprintf("SD: dh_name: %s\n", deviceHeader->dh_name);
     // cdprintf("SD: dh_next: %x\n", deviceHeader->dh_next);
-    // if ( ! is_my_unit(req->r_unit)) {
-    //     // This is  not for me to handle
-    //     struct device_header __far *nextDeviceHeader = deviceHeader->dh_next;
-    //     nextDeviceHeader->dh_strategy();
-    // }
+ 
 
 }
 
