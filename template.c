@@ -39,7 +39,11 @@ uint8_t *stack_bottom = our_stack + STACK_SIZE;
 uint32_t dos_stack;
 bool init_needed = TRUE;
 int8_t my_units[9] = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
-
+bpb my_bpb;
+bpb near *my_bpb_ptr = &my_bpb;
+MiniDrive my_drive;
+bpbtbl_t my_bpbtbl[9] = {NULL};
+bpbtbl_t far *my_bpbtbl_ptr = &my_bpbtbl;
 
 #endif // USE_INTERNAL_STACK
 
@@ -67,9 +71,10 @@ static uint16_t media_check (void)
   //media_check_data far *media_ptr;
 
   fpRequest->r_media_check = MK_FP(registers.ds, registers.dx);
-  if (debug) cdprintf("SD: media_check: unit=%d\n", fpRequest->r_mc_vol_id);
-  fpRequest->r_mc_ret_code = sd_media_check(*fpRequest->r_mc_vol_id) ? M_CHANGED : M_NOT_CHANGED;
-  return M_NOT_CHANGED;
+  if (debug) cdprintf("SD: media_check: unit=%x\n", fpRequest->r_mc_vol_id);
+  fpRequest->r_mc_ret_code = M_NOT_CHANGED;
+  //fpRequest->r_mc_ret_code = sd_media_check(*fpRequest->r_mc_vol_id) ? M_CHANGED : M_NOT_CHANGED;
+  return S_DONE;
 }
 
 /* build_bpb */
@@ -80,7 +85,7 @@ static uint16_t media_check (void)
 static uint16_t build_bpb (void)
 {
   if (debug)
-      cdprintf("SD: build_bpb: unit=%d\n", fpRequest->r_bpmdesc);
+      cdprintf("SD: build_bpb: unit=%x\n", fpRequest->r_bpmdesc);
   //we build the BPB during the device_init() method.
   return S_DONE;
 }

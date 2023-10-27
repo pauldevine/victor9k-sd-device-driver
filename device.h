@@ -420,6 +420,8 @@ typedef struct {
 
 typedef boot super;             /* Alias for boot structure             */
 
+typedef bpb *near bpbtbl_t[];     /*  Array of BPBs     */
+
 typedef struct {
   uint8_t r_length;               /*  Request Header length               */
   uint8_t r_unit;                 /*  Unit Code                           */
@@ -430,7 +432,7 @@ typedef struct {
     struct {
       uint8_t _r_nunits;          /*  number of units     */
       int8_t __far *_r_endaddr;     /*  Ending Address      */
-      bpb *__far * _r_bpbptr;     /*  ptr to BPB array    */
+      bpbtbl_t __far *_r_bpbptr;     /*  ptr to BPB array    */
       uint8_t _r_firstunit;
     } _r_init;
     media_check_data __far * _r_media_ptr;         /* pointer to media_check struct */
@@ -588,10 +590,6 @@ typedef struct {
 typedef struct {
     Sector sectors[NUM_SECTORS];
 } MiniDrive;
-
-MiniDrive my_drive;
-
-
 
 #endif /* _DEVICE_H_ */
 /*
