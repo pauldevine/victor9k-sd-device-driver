@@ -95,6 +95,9 @@ uint16_t device_init( void )
     bpb far *bpb_ptr;
     char far *bpb_cast_ptr;
     uint8_t i;
+    extern bpb my_bpb;
+    extern bpb near *my_bpb_ptr;
+    extern bpbtbl_t far *my_bpbtbl_ptr;
 
     get_all_registers(&registers);
 
@@ -117,13 +120,15 @@ uint16_t device_init( void )
     cdprintf("SD: dh_name: %s\n", name_buffer);
     cdprintf("SD: dh_next: %x\n", dev_header->dh_next);
 
+    
+    cdprintf("SD: dh_num_drives: %x r_unit: %x\n", dev_header->dh_num_drives, fpRequest->r_unit);
+
     //DOS is overloading a data structure that in normal use stores the BPB, 
     //for init() it stores the string that sits in config.sys
     //hence I'm casting to a char
     bpb_cast_ptr = (char __far *)(fpRequest->r_bpbptr);  
-    bpb_ptr = *(fpRequest->r_bpbptr);   //also need the BPB to return results to DOS
-
-    cdprintf("gathered bpb_ptr: %x\n", bpb_ptr);
+    
+    cdprintf("gathered bpb_ptr: %x\n", bpb_cast_ptr);
     /* Parse the options from the CONFIG.SYS file, if any... */
     if (!parse_options((char far *) bpb_cast_ptr)) {
         cdprintf("SD: bad options in CONFIG.SYS\n");
@@ -140,7 +145,18 @@ uint16_t device_init( void )
         //fpRequest->r_endaddr = MK_FP( getCS(), 0 );
         return (S_DONE | S_ERROR | E_NOT_READY ); 
     }
+    //setting unit count to 1 to make DOS happy
+    dev_header->dh_num_drives = 1;
     fpRequest->r_nunits = 1;         //tell DOS how many drives we're instantiating.
+    *(my_bpbtbl_ptr)[0] = my_bpb_ptr;
+    fpRequest->r_bpbptr = my_bpbtbl_ptr;
+    bpb_ptr = my_bpb_ptr;
+
+    cdprintf("SD: done parsing bpb_ptr: = %4x:%4x\n", FP_SEG(bpb_ptr), FP_OFF(bpb_ptr));
+    cdprintf("SD: done parsing my_bpb_ptr = %4x:%4x\n", FP_SEG(my_bpb_ptr), FP_OFF(my_bpb_ptr));
+    cdprintf("SD: done parsing my_bpbtbl_ptr = %4x:%4x\n", FP_SEG(my_bpbtbl_ptr), FP_OFF(my_bpbtbl_ptr));
+    cdprintf("SD: done parsing registers.cs = %4x:%4x\n", FP_SEG(registers.cs), FP_OFF(0));
+    cdprintf("SD: done parsing getCS() = %4x:%4x\n", FP_SEG(getCS()), FP_OFF(&transient_data));
     cdprintf("SD: dh_num_drives: %x r_unit: %x\n", dev_header->dh_num_drives, fpRequest->r_unit);
 
     cdprintf("SD: bpb_ptr = %4x:%4x\n", FP_SEG(bpb_ptr), FP_OFF(bpb_ptr));
@@ -149,28 +165,31 @@ uint16_t device_init( void )
     cdprintf("SD initialized on DOS drive %c\n",(fpRequest->r_firstunit + 'A'));
     for (i=0; i < fpRequest->r_nunits; i++) {
         my_units[i] = fpRequest->r_firstunit + i;
+        cdprintf("SD:  my_units[%d]: %d\n",(i,fpRequest->r_firstunit + i));
     }
 
     if (debug)
     {   
       cdprintf("SD: BPB data:\n");
-      cdprintf("Bytes per Sector: %d\n", bpb_ptr->bpb_nbyte);
-      cdprintf("Sectors per Allocation Unit: %d\n", bpb_ptr->bpb_nsector);
-      cdprintf("# Reserved Sectors: %d\n", bpb_ptr->bpb_nreserved);
-      cdprintf("# FATs: %d\n", bpb_ptr->bpb_nfat);
-      cdprintf("# Root Directory entries: %d  ", bpb_ptr->bpb_ndirent);
-      cdprintf("Size in sectors: %d\n", bpb_ptr->bpb_nsize);
-      cdprintf("MEDIA Descriptor Byte: %x  ", bpb_ptr->bpb_mdesc);
-      cdprintf("FAT size in sectors: %d\n", bpb_ptr->bpb_nfsect);
-      cdprintf("Sectors per track : %d  ", bpb_ptr->bpb_nsecs);
-      cdprintf("Number of heads: %d\n", bpb_ptr->bpb_nheads);
-      cdprintf("Hidden sectors: %d  ", bpb_ptr->bpb_hidden);
-      cdprintf("Hidden sectors 32 hex: %L\n", bpb_ptr->bpb_hidden);
-      cdprintf("Size in sectors if : %L\n", bpb_ptr->bpb_huge);
+      cdprintf("Bytes per Sector: %d\n", my_bpb_ptr->bpb_nbyte);
+      cdprintf("Sectors per Allocation Unit: %d\n", my_bpb_ptr->bpb_nsector);
+      cdprintf("# Reserved Sectors: %d\n", my_bpb_ptr->bpb_nreserved);
+      cdprintf("# FATs: %d\n", my_bpb_ptr->bpb_nfat);
+      cdprintf("# Root Directory entries: %d  ", my_bpb_ptr->bpb_ndirent);
+      cdprintf("Size in sectors: %d\n", my_bpb_ptr->bpb_nsize);
+      cdprintf("MEDIA Descriptor Byte: %x  ", my_bpb_ptr->bpb_mdesc);
+      cdprintf("FAT size in sectors: %d\n", my_bpb_ptr->bpb_nfsect);
+      cdprintf("Sectors per track : %d  ", my_bpb_ptr->bpb_nsecs);
+      cdprintf("Number of heads: %d\n", my_bpb_ptr->bpb_nheads);
+      cdprintf("Hidden sectors: %d  ", my_bpb_ptr->bpb_hidden);
+      cdprintf("Hidden sectors 32 hex: %L\n", my_bpb_ptr->bpb_hidden);
+      cdprintf("Size in sectors if : %L\n", my_bpb_ptr->bpb_huge);
+      cdprintf("SD: my_bpb_ptr = %4x:%4x\n", FP_SEG(my_bpb_ptr), FP_OFF(my_bpb_ptr));
     }
     Enable(); 
 
-    fpRequest->r_endaddr = MK_FP(getCS(), &transient_data);
+    //getting the segment from one of my far variables. transient_data defined in the cstrtsys.asm file
+    fpRequest->r_endaddr = MK_FP(my_bpb_ptr, &transient_data);
 
   return S_DONE;    
 }
