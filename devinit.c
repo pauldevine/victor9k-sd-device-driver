@@ -120,7 +120,9 @@ uint16_t device_init( void )
     cdprintf("SD: dh_name: %s\n", name_buffer);
     cdprintf("SD: dh_next: %x\n", dev_header->dh_next);
 
-    
+    //setting unit count to 1 to make DOS happy
+    dev_header->dh_num_drives = 1;
+    fpRequest->r_nunits = 1;
     cdprintf("SD: dh_num_drives: %x r_unit: %x\n", dev_header->dh_num_drives, fpRequest->r_unit);
 
     //DOS is overloading a data structure that in normal use stores the BPB, 
@@ -139,7 +141,7 @@ uint16_t device_init( void )
 
     /* Try to make contact with the drive... */
     if (debug) cdprintf("SD: initializing drive\n");
-    if (!sd_initialize(fpRequest->r_unit, partition_number, bpb_ptr))    {
+    if (!sd_initialize(fpRequest->r_unit, partition_number, my_bpb_ptr))    {
         cdprintf("SD: drive not connected or not powered\n");
         printMsg(hellomsg);
         //fpRequest->r_endaddr = MK_FP( getCS(), 0 );
@@ -152,14 +154,12 @@ uint16_t device_init( void )
     fpRequest->r_bpbptr = my_bpbtbl_ptr;
     bpb_ptr = my_bpb_ptr;
 
-    cdprintf("SD: done parsing bpb_ptr: = %4x:%4x\n", FP_SEG(bpb_ptr), FP_OFF(bpb_ptr));
-    cdprintf("SD: done parsing my_bpb_ptr = %4x:%4x\n", FP_SEG(my_bpb_ptr), FP_OFF(my_bpb_ptr));
+    cdprintf("SD: done parsing DOS header bpb_ptr: = %4x:%4x\n", FP_SEG(bpb_ptr), FP_OFF(bpb_ptr));
+    cdprintf("SD: done parsing I created my_bpb_ptr = %4x:%4x\n", FP_SEG(my_bpb_ptr), FP_OFF(my_bpb_ptr));
     cdprintf("SD: done parsing my_bpbtbl_ptr = %4x:%4x\n", FP_SEG(my_bpbtbl_ptr), FP_OFF(my_bpbtbl_ptr));
     cdprintf("SD: done parsing registers.cs = %4x:%4x\n", FP_SEG(registers.cs), FP_OFF(0));
     cdprintf("SD: done parsing getCS() = %4x:%4x\n", FP_SEG(getCS()), FP_OFF(&transient_data));
     cdprintf("SD: dh_num_drives: %x r_unit: %x\n", dev_header->dh_num_drives, fpRequest->r_unit);
-
-    cdprintf("SD: bpb_ptr = %4x:%4x\n", FP_SEG(bpb_ptr), FP_OFF(bpb_ptr));
 
     // /* All is well.  Tell DOS how many units and the BPBs... */
     cdprintf("SD initialized on DOS drive %c\n",(fpRequest->r_firstunit + 'A'));
