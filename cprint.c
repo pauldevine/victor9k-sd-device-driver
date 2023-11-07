@@ -201,7 +201,7 @@ void cdprintln(const char* str) {
 /* using the "safe" console output routines.  Only a few escape seq- */
 /* uences are allowed: %d, %x and %s.  A width modifier (e.g. %2x) is   */
 /* recognized only for %x, and then may only be a single decimal digit. */
-void cdprintf (char near *msg, ...)
+void cdprintf (char *msg, ...)
 {
   va_list ap;  char *str;  int size, ival;  unsigned uval; uint16_t luval;
   va_start (ap, msg);
@@ -242,7 +242,7 @@ void cdprintf (char near *msg, ...)
         ++msg;
       }
     } else if (*msg == '\n') {
-      newline(0xC80);  
+      newline();  
       ++msg;
     } else {
       outchr(*msg);  

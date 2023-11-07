@@ -58,5 +58,5 @@ void outstr (char *p);
 void outdec (int val);
 void outhex (unsigned val, int ndigits);
 void outcrlf (void);
-void cdprintf (char near *msg, ...);
+void cdprintf (char *msg, ...);
 #endif
