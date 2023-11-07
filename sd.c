@@ -174,15 +174,15 @@ int find_volume (uint8_t unit, uint8_t partno, bpb far *bpb)
       bpb->bpb_nfat = 2;
    bpb->bpb_ndirent = LD_WORD(local_buffer+BPB_RootEntCnt);   
    bpb->bpb_nsize = LD_WORD(local_buffer+BPB_TotSec16);
-   if (!bpb->bpb_nsize) 
-      bpb->bpb_huge = LD_DWORD(local_buffer+BPB_TotSec32);
-   else
-      bpb->bpb_huge = bpb->bpb_nsize;
+   // if (!bpb->bpb_nsize) 
+   //    bpb->bpb_huge = LD_DWORD(local_buffer+BPB_TotSec32);
+   // else
+      // bpb->bpb_huge = bpb->bpb_nsize;
    bpb->bpb_mdesc = local_buffer[BPB_Media];
    bpb->bpb_nfsect = LD_WORD(local_buffer+BPB_FATSz16);             /* Number of sectors per FAT */
-   bpb->bpb_nsecs = LD_WORD(local_buffer+BPB_SecPerTrk);     /* Number of sectors per track */
-   bpb->bpb_nheads = LD_WORD(local_buffer+BPB_NumHeads);     /* Number of heads */
-   bpb->bpb_hidden = 1;
+   // bpb->bpb_nsecs = LD_WORD(local_buffer+BPB_SecPerTrk);     /* Number of sectors per track */
+   // bpb->bpb_nheads = LD_WORD(local_buffer+BPB_NumHeads);     /* Number of heads */
+   // bpb->bpb_hidden = 1;
 
    partition_offset = bsect;
    return 0;

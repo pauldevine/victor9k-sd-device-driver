@@ -170,12 +170,12 @@ uint16_t device_init( void )
     my_bpb_ptr->bpb_nfat = 2;              /* Number of FAT copies */
     my_bpb_ptr->bpb_ndirent = 16;   
     my_bpb_ptr->bpb_nsize = 32;
-    my_bpb_ptr->bpb_mdesc = 0xF8;
+    my_bpb_ptr->bpb_mdesc = 0xFD;
     my_bpb_ptr->bpb_nfsect = 1;             /* Number of sectors per FAT */
-    my_bpb_ptr->bpb_nsecs = 8;     /* Number of sectors per track */
-    my_bpb_ptr->bpb_nheads = 1;     /* Number of heads */
-    my_bpb_ptr->bpb_hidden = 0;
-    my_bpb_ptr->bpb_huge = 0;
+    // my_bpb_ptr->bpb_nsecs = 8;     /* Number of sectors per track */
+    // my_bpb_ptr->bpb_nheads = 1;     /* Number of heads */
+    // my_bpb_ptr->bpb_hidden = 0;
+    // my_bpb_ptr->bpb_huge = 0;
 
     cdprintf("SD: my_bpb_ptr = %4x:%4x\n", FP_SEG(my_bpb_ptr), FP_OFF(my_bpb_ptr));
 
@@ -197,16 +197,19 @@ uint16_t device_init( void )
       cdprintf("Size in sectors: %d\n", my_bpb_ptr->bpb_nsize);
       cdprintf("MEDIA Descriptor Byte: %x  ", my_bpb_ptr->bpb_mdesc);
       cdprintf("FAT size in sectors: %d\n", my_bpb_ptr->bpb_nfsect);
-      cdprintf("Sectors per track : %d  ", my_bpb_ptr->bpb_nsecs);
-      cdprintf("Number of heads: %d\n", my_bpb_ptr->bpb_nheads);
-      cdprintf("Hidden sectors: %d  ", my_bpb_ptr->bpb_hidden);
-      cdprintf("Hidden sectors 32 hex: %L\n", my_bpb_ptr->bpb_hidden);
-      cdprintf("Size in sectors if : %L\n", my_bpb_ptr->bpb_huge);
+      // cdprintf("Sectors per track : %d  ", my_bpb_ptr->bpb_nsecs);
+      // cdprintf("Number of heads: %d\n", my_bpb_ptr->bpb_nheads);
+      // cdprintf("Hidden sectors: %d  ", my_bpb_ptr->bpb_hidden);
+      // cdprintf("Hidden sectors 32 hex: %L\n", my_bpb_ptr->bpb_hidden);
+      // cdprintf("Size in sectors if : %L\n", my_bpb_ptr->bpb_huge);
     }
-    Enable(); 
+
+    cdprintf("SD: fpRequest->r_endaddr = %4x:%4x\n", FP_SEG(fpRequest->r_endaddr), FP_OFF(&transient_data));
 
     //getting the segment from one of my far variables. transient_data defined in the cstrtsys.asm file
-    fpRequest->r_endaddr = MK_FP(my_bpb_ptr, &transient_data);
+    //fpRequest->r_endaddr = MK_FP(my_bpb_ptr, &transient_data);
+
+    cdprintf("SD: fpRequest->r_endaddr = %4x:%4x\n", FP_SEG(fpRequest->r_endaddr), FP_OFF(fpRequest->r_endaddr));
 
   return S_DONE;    
 }

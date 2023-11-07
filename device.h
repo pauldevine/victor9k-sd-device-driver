@@ -140,7 +140,7 @@
  *      structures
  */
 
-#pragma pack( push, 1)
+#pragma pack(1)
 
 /* Device header */
 
@@ -201,10 +201,10 @@ typedef struct {
   uint16_t bpb_nsize;              /* Size in sectors              */ 
   uint8_t bpb_mdesc;              /* MEDIA Descriptor Byte        */
   uint16_t bpb_nfsect;             /* FAT size in sectors          */
-  uint16_t bpb_nsecs;              /* Sectors per track            */
-  uint16_t bpb_nheads;             /* Number of heads              */
-  uint32_t bpb_hidden;             /* Hidden sectors               */
-  uint32_t bpb_huge;               /* Size in sectors if           */
+  // uint16_t bpb_nsecs;              /* Sectors per track            */
+  // uint16_t bpb_nheads;             /* Number of heads              */
+  // uint32_t bpb_hidden;             /* Hidden sectors               */
+  // uint32_t bpb_huge;               /* Size in sectors if           */
   /* bpb_nsize == 0               */
 #ifdef WITHFAT32
   uint32_t bpb_xnfsect;            /* FAT size in sectors if       */
@@ -381,8 +381,8 @@ struct fsinfo {
 
 /* Victor 9000 IOCTL Get_Disk_Drive_Physical_Info() data structure */
 typedef struct {
-  uint16_t di_ioctl_type;     /* Get_Disk_Drive_Physical_Info() always 0x10h. */
-  uint16_t di_ioctl_status;   /* 0 if successful, 1 if error */
+  uint8_t di_ioctl_type;     /* Get_Disk_Drive_Physical_Info() always 0x10h. */
+  uint8_t di_ioctl_status;   /* 0 if successful, 1 if error */
   uint8_t di_disk_type;       /* 0 = floppy. 1 = hard drive */
   uint8_t di_disk_location;   /* for floppy only 0 = left, 1 = right drive */
 } v9k_disk_info;
