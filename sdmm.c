@@ -90,7 +90,7 @@ static volatile V9kParallelPort far *via2 = MK_FP(PHASE2_DEVICE_SEGMENT,
 #define CS_INIT()
 
 static bool via_initialized;
-extern bool init_needed;
+extern bool initNeeded;
 const int bit_delay_us = 175;
 
 
@@ -184,7 +184,7 @@ void par_port_init(void) {
    STATUSPORT=&via1->out_in_reg_b;
    CONTROLPORT=&via1->out_in_reg_b;
    via_initialized = true;
-   init_needed = false;
+   initNeeded = false;
 
    cdprintf("Finished via_initialized, cycling bits\n");
    //say hello

@@ -415,7 +415,6 @@ typedef struct {
 typedef struct {
   uint8_t _r_media_desc;          /*  MEDIA Descriptor    */
   uint8_t _r_ret_code;          /*  Return Code         */
-  uint8_t __far * _r_vol_id;        /* volume id */
 } media_check_data;
 
 typedef boot super;             /* Alias for boot structure             */
@@ -481,7 +480,6 @@ typedef struct {
 #define r_media_check   _r_x._r_media_ptr
 #define r_mc_media_desc _r_x._r_media_ptr->_r_media_desc
 #define r_mc_ret_code   _r_x._r_media_ptr->_r_ret_code
-#define r_mc_vol_id     _r_x._r_media_ptr->_r_vol_id
 
 /* Build BPB packet macros                                              */
 #define r_bpmdesc       _r_x._r_bpb._r_meddesc
@@ -494,8 +492,6 @@ typedef struct {
 #define r_trans         _r_x._r_rw_ptr->_r_trans
 #define r_count         _r_x._r_rw_ptr->_r_count
 #define r_start         _r_x._r_rw_ptr->_r_start
-#define r_rw_vol_id     _r_x._r_rw_ptr->_r_vol_id
-#define r_huge          _r_x._r_rw_ptr->_r_huge
 
 /* ndread packet macros                                                 */
 #define r_ndbyte        _r_x._r_nd._r_ndbyte

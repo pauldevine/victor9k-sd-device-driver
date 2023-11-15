@@ -26,7 +26,7 @@
 extern void *transient_data;
 extern bool debug;
 extern int8_t my_units[9];
-extern uint16_t device_init( void );
+extern uint16_t deviceInit( void );
 extern struct device_header far *dev_header;
 
 //used for RAMdrive version

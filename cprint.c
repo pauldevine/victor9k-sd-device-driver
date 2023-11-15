@@ -31,8 +31,80 @@
 #include <dos.h>        /* used only for MK_FP !      */
 #include <stdarg.h>     /* needed for variable argument lists  */
 
+#include "device.h"
 #include "cprint.h"     /* Console printing */
 
+
+char* intToAscii(int value, char* buffer) {
+    char temp[20];
+    char *tp = temp;
+    char *p = buffer;
+    int i;
+    long v = value >= 0 ? value : -value;
+
+    while (v || tp == temp) {
+        i = v % 10;
+        v /= 10;
+        *tp++ = '0' + i;
+    }
+
+    if (value < 0) *p++ = '-';
+    while (tp > temp) *p++ = *--tp;
+
+    return buffer;
+}
+
+// A very simple version of a function similar to sprintf
+// Writes a formatted string to a sector's data buffer.
+// This example only handles %s (string) and %d (decimal integer) for simplicity.
+void writeLog(Sector *sector, const char *format, ...) {
+    va_list args;
+    va_start(args, format);
+
+    char *buffer = sector->data;
+    const char *p = format;
+
+    while (*p) {
+        if (*p == '%') {
+            switch (*++p) {
+                case 'd': { // Handle decimal integer
+                    int num = va_arg(args, int);
+                    char *n = intToAscii(num, buffer); // Convert integer to string
+                    while (*n) {
+                        *buffer++ = *n++; // Copy number to buffer
+                    }
+                    break;
+                }
+                case 'x': { // handle hex number
+                    unsigned int val = va_arg(args, unsigned int);
+                    for (int i = (sizeof(unsigned int) * 2) - 1; i >= 0; i--) {
+                        int digit = (val >> (4 * i)) & 0xF;
+                        if (digit > 9) *buffer++ = 'A' + digit - 10;
+                        else *buffer++ = '0' + digit;
+                    }
+                    break;
+                }
+                case 's': { // Handle string
+                    char *str = va_arg(args, char*);
+                    while (*str) {
+                        *buffer++ = *str++; // Copy string to buffer
+                    }
+                    break;
+                }
+                default: // Unsupported format
+                    *buffer++ = '%'; // Copy the unsupported format specifier
+                    *buffer++ = *p;
+                    break;
+            }
+        } else {
+            *buffer++ = *p; // Copy regular character
+        }
+        p++;
+    }
+
+    *buffer = '\0'; // Null-terminate the buffer
+    va_end(args);
+}
 
 void set_crtc_reg(char reg, char value) {
     static volatile char far *crtc_addr_reg = MK_FP(PHASE2_DEVICE_SEGMENT, 

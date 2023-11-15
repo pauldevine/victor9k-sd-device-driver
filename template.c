@@ -37,13 +37,13 @@
 static uint8_t our_stack[STACK_SIZE];
 uint8_t *stack_bottom = our_stack + STACK_SIZE;
 uint32_t dos_stack;
-bool init_needed = TRUE;
+bool initNeeded = TRUE;
 int8_t my_units[9] = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
 bpb my_bpb;
 bpb near *my_bpb_ptr = &my_bpb;
-MiniDrive my_drive;
+MiniDrive myDrive = {0};
 bpbtbl_t my_bpbtbl[9] = {NULL};
-bpbtbl_t far *my_bpbtbl_ptr = &my_bpbtbl;
+bpbtbl_t far *my_bpbtbl_ptr = (bpbtbl_t far *)my_bpbtbl;
 
 #endif // USE_INTERNAL_STACK
 
@@ -59,65 +59,82 @@ static uint16_t close( void )
     return S_DONE;
 } 
 
-/* media_check */
+/* mediaCheck */
 /*    DOS calls this function to determine if the tape in the drive has   */
 /* been changed.  The SD hardware can't determine this (like many      */
 /* older 360K floppy drives), and so we always return the "Don't Know" */
 /* response.  This works well enough...                                */
-static uint16_t media_check (void)
+static uint16_t mediaCheck (void)
 {
   struct ALL_REGS registers;
   get_all_registers(&registers);
-  //media_check_data far *media_ptr;
-
-  fpRequest->r_media_check = MK_FP(registers.ds, registers.dx);
-  if (debug) cdprintf("SD: media_check: unit=%x\n", fpRequest->r_mc_vol_id);
+  // mediaCheck_data far *media_ptr;
+  //cdprintf("SD: mediaCheck()\n");
+  //cdprintf("about to parse mediaCheck, ES: %x BX: %x\n", registers.es, registers.bx);
+  //fpRequest->r_mediaCheck = MK_FP(registers.es, registers.bx);
+  //cdprintf("SD: mediaCheck: unit=%x\n", fpRequest->r_mc_vol_id);
+  
+  writeLog(&myDrive.sectors[28], "SD: mediaCheck(): r_unit %x media_descriptor = %x fpRequest->r_mc_ret_code = %x es: %x bx: %x r_mc_media_desc: %x:%x\n", 
+    fpRequest->r_unit, fpRequest->r_mc_media_desc, M_NOT_CHANGED, registers.es, registers.bx, 
+    FP_SEG(fpRequest->r_mc_media_desc), FP_OFF(fpRequest->r_mc_media_desc));
+ 
   fpRequest->r_mc_ret_code = M_NOT_CHANGED;
-  //fpRequest->r_mc_ret_code = sd_media_check(*fpRequest->r_mc_vol_id) ? M_CHANGED : M_NOT_CHANGED;
+  //fpRequest->r_mc_ret_code = sd_mediaCheck(*fpRequest->r_mc_vol_id) ? M_CHANGED : M_NOT_CHANGED;
   return S_DONE;
 }
 
-/* build_bpb */
+/* buildBpb */
 /*   DOS uses this function to build the BIOS parameter block for the   */
 /* specified drive.  For diskettes, which support different densities   */
 /* and formats, the driver actually has to read the BPB from the boot   */
 /* sector on the disk.  */
-static uint16_t build_bpb (void)
+static uint16_t buildBpb (void)
 {
-  if (debug)
-      cdprintf("SD: build_bpb: unit=%x\n", fpRequest->r_bpmdesc);
-  //we build the BPB during the device_init() method.
+  // cdprintf("SD: buildBpb()\n");
+  // if (debug)
+  //     cdprintf("SD: buildBpb: unit=%x\n", fpRequest->r_bpmdesc);
+  writeLog(&myDrive.sectors[27], "SD: buildBpb(): unit=%x\n", fpRequest->r_bpmdesc);
+  //we build the BPB during the deviceInit() method.
   return S_DONE;
 }
 
-static uint16_t IOCTL_input(void)
+static uint16_t IOCTLInput(void)
 {
-    struct ALL_REGS registers;
-    bool success, hard_disk, left;
-    get_all_registers(&registers);
+    //struct ALL_REGS registers;
+    bool failed, hard_disk, left;
+    //get_all_registers(&registers);
+    //cdprintf("SD: IOCTLInput()\n");
+    //fpRequest->r_v9k_disk_info_ptr = MK_FP(registers.ds, registers.dx);
 
-    fpRequest->r_v9k_disk_info_ptr = MK_FP(registers.ds, registers.dx);
-
-    cdprintf("SD: IOCTL_Input()");
+    //cdprintf("SD: IOCTLInput()");
+    writeLog(&myDrive.sectors[26], "SD: IOCTLInput(): r_di_ioctl_type = %x\n", fpRequest->r_di_ioctl_type);
     {
         switch (fpRequest->r_di_ioctl_type)
         {
         case GET_DISK_DRIVE_PHYSICAL_INFO:
-            cdprintf("SD: IOCTL_Input() - GET_DISK_DRIVE_PHYSICAL_INFO");
+            // cdprintf("SD: IOCTLInput() - GET_DISK_DRIVE_PHYSICAL_INFO");
+            // cdprintf("SD: IOCTLInput() -AH — IOCTL function number (44h) %x", registers.ax);
+            // cdprintf("SD: IOCTLInput() -AL — IOCTL device driver read request value (4) %x", registers.ax);
+            // cdprintf("SD: IOCTLInput() -BL — drive (0 = A, 1 = B, etc.) %x", registers.bx);
+            // cdprintf("SD: IOCTLInput() -CX — length in bytes of this request structure (6) %x", registers.cx);
+            // cdprintf("SD: IOCTLInput() -DS:DX — pointer to data structure %x:%x", registers.ds, registers.dx);
+
             fpRequest->r_di_ioctl_type = GET_DISK_DRIVE_PHYSICAL_INFO;
-            success = 0;         /* 0 = success, 1 = failure */
+            failed = false;         /* 0 = success, 1 = failure */
             hard_disk = true;
             left = false;
-            fpRequest->r_di_ioctl_status = success;
+            fpRequest->r_di_ioctl_status = failed;
             fpRequest->r_di_disk_type = hard_disk;
             fpRequest->r_di_disk_location = left;
 
-            cdprintf("SD: IOCTL_Input() - GET_DISK_DRIVE_PHYSICAL_INFO - success: %d", success);
+            //cdprintf("SD: IOCTLInput() - GET_DISK_DRIVE_PHYSICAL_INFO - success: %d", success);
 
             return S_DONE;
             break;
 
         default:
+            failed = true;
+            fpRequest->r_di_ioctl_status = failed;
             return (S_DONE | S_ERROR | E_UNKNOWN_COMMAND);
             break;
         }
@@ -126,7 +143,7 @@ static uint16_t IOCTL_input(void)
     return (S_DONE | S_ERROR | E_HEADER_LENGTH);
 }
 
-/* dos_error */
+/* dosError */
 /*   This routine will translate a SD error code into an appropriate  */
 /* DOS error code.  This driver never retries on any error condition.   */
 /* For actual tape read/write errors it's pointless because the drive   */
@@ -136,17 +153,17 @@ static uint16_t IOCTL_input(void)
 /* the usual DOS "Abort, Retry or Ignore" dialog. Communications errors */
 /* are a special situation.  In these cases we also set global flag to  */
 /* force a controller initialization before the next operation.      */
-int dos_error (int status)
+int dosError (int status)
 {
   switch (status) {
     case RES_OK:     return 0;
     case RES_WRPRT:  return E_WRITE_PROTECT;
-    case RES_NOTRDY: init_needed = TRUE; return E_NOT_READY;
-    case RES_ERROR:  init_needed = TRUE; return E_SECTOR_NOT_FND;
+    case RES_NOTRDY: initNeeded = false; return E_NOT_READY;               
+    case RES_ERROR:  initNeeded = false; return E_SECTOR_NOT_FND;
     case RES_PARERR: return E_CRC_ERROR;
 
     default:
-    cdprintf("SD: unknown drive error - status = 0x%2x\n", status);
+    writeLog(&myDrive.sectors[25], "SD: unknown drive error - status = 0x%2x\n", status);
         return E_GENERAL_FAILURE;
   }
 }
@@ -158,45 +175,31 @@ unsigned get_stackpointer();
 
 /* Read Data */
 
-static uint16_t read_block (void)
+static uint16_t readBlock (void)
 {
-  uint32_t lbn;
-  uint16_t count;  
-  int status;  
-  uint8_t far *dta;
-  uint16_t sendct;
-  struct ALL_REGS registers;
-  bool success, hard_disk, left;
-
-  get_all_registers(&registers);
-
-  fpRequest->r_rw_ptr = MK_FP(registers.ds, registers.dx);
-
+  // cdprintf("SD: readBlock()\n");
   if (debug) {
-    cdprintf("SD: read block: unit=%d, start=%d, count=%d, dta=%4x:%4x\n",
-             fpRequest->r_rw_vol_id, fpRequest->r_start, fpRequest->r_count, 
-             FP_SEG(fpRequest->r_rw_ptr), FP_OFF(fpRequest->r_rw_ptr));
+    writeLog(&myDrive.sectors[24], "SD: read block: media_descriptor=%d, start=%d, count=%d, r_trans=%x:%x\n",
+     fpRequest->r_meddesc, fpRequest->r_start, fpRequest->r_count, 
+             FP_SEG(fpRequest->r_trans), FP_OFF(fpRequest->r_trans));
   }
-  if (init_needed)  return (S_DONE | S_ERROR | E_NOT_READY); //not initialized yet
+  if (initNeeded)  return (S_DONE | S_ERROR | E_NOT_READY); //not initialized yet
 
-  count = fpRequest->r_count,  
-          fpRequest->r_start,  
-          dta = fpRequest->r_trans;
-  lbn = (fpRequest->r_start == 0xFFFF) ? fpRequest->r_huge : fpRequest->r_start;
-  while (count > 0) {
-      sendct = (count > 16) ? 16 : count;
-      status = sd_read(*fpRequest->r_rw_vol_id, lbn, dta, sendct);
+  uint16_t count; 
+  uint16_t numberOfSectorsToCopy = fpRequest->r_count;  
 
-      if (status != RES_OK)  {
-        if (debug) cdprintf("SD: read error - status=%d\n", status);
-        //_fmemset(dta, 0, BLOCKSIZE);
-        return (S_DONE | S_ERROR | dos_error(status));
-      }
-
-    lbn += sendct;
-    count -= sendct;
-    dta += (sendct*BLOCKSIZE);
+  // Check if the write operation is within the bounds of the MiniDrive
+  if (fpRequest->r_start + numberOfSectorsToCopy > NUM_SECTORS) {
+      return (S_DONE | S_ERROR | E_SECTOR_NOT_FND); // Or appropriate error code
   }
+
+  Sector *startSector = &myDrive.sectors[fpRequest->r_start]; 
+
+  // Calculate the number of bytes to copy
+  unsigned int numBytes = SECTOR_SIZE * numberOfSectorsToCopy;
+
+  // Perform the copy
+  _fmemcpy(fpRequest->r_trans, startSector, numBytes);
   return (S_DONE);
 }
 
@@ -205,50 +208,39 @@ static uint16_t read_block (void)
 /* Write Data with Verification */
 static uint16_t write_block (bool verify)
 {
-  uint32_t lbn;
-  uint16_t count;  
-  int status; 
-  uint8_t far *dta;
-  uint16_t sendct;
-  struct ALL_REGS registers;
-  bool success, hard_disk, left;
+    if (debug) {
+        writeLog(&myDrive.sectors[23], "SD: write block: unit=%d, start=%d, count=%d, r_trans=%x:%x\n",
+                 fpRequest->r_meddesc, fpRequest->r_start, fpRequest->r_count, 
+                 FP_SEG(fpRequest->r_trans), FP_OFF(fpRequest->r_trans));
+    }
+    if (initNeeded) return (S_DONE | S_ERROR | E_NOT_READY); // Not initialized yet
 
-  get_all_registers(&registers);
-  fpRequest->r_rw_ptr = MK_FP(registers.ds, registers.dx);
+    uint16_t numberOfSectorsToCopy = fpRequest->r_count;
+    Sector *startSector = &myDrive.sectors[fpRequest->r_start];
 
-  if (debug) {
-    cdprintf("SD: write block: verify=%d unit=%d, start=%d, count=%d, dta=%4x:%4x\n",
-             verify, fpRequest->r_rw_vol_id, fpRequest->r_start, fpRequest->r_count, 
-             FP_SEG(fpRequest->r_rw_ptr), FP_OFF(fpRequest->r_rw_ptr));
-  }
-  if (init_needed)  return (S_DONE | S_ERROR | E_NOT_READY); //not initialized yet
-  count = fpRequest->r_count, dta = fpRequest->r_trans;
-  lbn = (fpRequest->r_start == 0xFFFF) ? fpRequest->r_huge : fpRequest->r_start;
-  while (count > 0) {
-    sendct = (count > 16) ? 16 : count;
-    status = sd_write(*fpRequest->r_rw_vol_id, lbn, dta, sendct);
-
-    if (status != RES_OK)  {
-      if (debug) cdprintf("SD: write error - status=%d\n", status);
-      return (S_DONE | S_ERROR | dos_error(status));
+    // Check if the write operation is within the bounds of the MiniDrive
+    if (fpRequest->r_start + numberOfSectorsToCopy > NUM_SECTORS) {
+        return (S_DONE | S_ERROR | E_SECTOR_NOT_FND); // Or appropriate error code
     }
 
-    lbn += sendct;
-    count -= sendct;
-    dta += (sendct*BLOCKSIZE);
-  }
-  return (S_DONE);
+    // Calculate the number of bytes to copy
+    unsigned int numBytes = SECTOR_SIZE * numberOfSectorsToCopy;
+
+    // Perform the copy from the DOS buffer to the MiniDrive
+    _fmemcpy(startSector->data, fpRequest->r_trans, numBytes);
+
+    return (S_DONE);
 }
 
-static uint16_t write_no_verify () {
+static uint16_t writeNoVerify () {
     return write_block(FALSE);
 }
 
-static uint16_t write_verify () {
+static uint16_t writeVerify () {
     return write_block(TRUE);
 }
 
-static bool is_my_unit(int8_t unitCode) {
+static bool isMyUnit(int8_t unitCode) {
   for (int i = 0; i < sizeof(my_units); ++i) {
     if (my_units[i] == -1) {
       break;  // End of valid unit codes in the array
@@ -262,16 +254,16 @@ static bool is_my_unit(int8_t unitCode) {
 
 static driverFunction_t dispatchTable[] =
 {
-    device_init,         // 0x00 Initialize
-    media_check,         // 0x01 MEDIA Check
-    build_bpb,           // 0x02 Build BPB
-    IOCTL_input,         // 0x03 Ioctl In
-    read_block,          // 0x04 Input (Read)
+    deviceInit,          // 0x00 Initialize
+    mediaCheck,          // 0x01 MEDIA Check
+    buildBpb,            // 0x02 Build BPB
+    IOCTLInput,          // 0x03 Ioctl In
+    readBlock,           // 0x04 Input (Read)
     NULL,                // 0x05 Non-destructive Read
     NULL,                // 0x06 Input Status
     NULL,                // 0x07 Input Flush
-    write_no_verify,     // 0x08 Output (Write)
-    write_verify,        // 0x09 Output with verify
+    writeNoVerify,       // 0x08 Output (Write)
+    writeVerify,         // 0x09 Output with verify
     NULL,                // 0x0A Output Status
     NULL,                // 0x0B Output Flush
     NULL,                // 0x0C Ioctl Out
@@ -307,11 +299,16 @@ void __far DeviceInterrupt( void )
     }
     else
     {
-        cdprintf("SD: command: %d r_unit: %d\n", fpRequest->r_command, fpRequest->r_unit);
-        if ((fpRequest->r_command == C_INIT) || is_my_unit(fpRequest->r_unit)) {
+        writeLog(&myDrive.sectors[30], "SD: DeviceInterrupt command: %d r_unit: %d isMyUnit(): %d r_status: %d r_length: %x initNeeded: %d\n",
+           fpRequest->r_command, fpRequest->r_unit, isMyUnit(fpRequest->r_unit), fpRequest->r_status, fpRequest->r_length, initNeeded);
+       // cdprintf("SD: command: %d r_unit: %d isMyUnit(): %d\n", fpRequest->r_command, fpRequest->r_unit, isMyUnit(fpRequest->r_unit));
+        
+        if ((initNeeded && fpRequest->r_command == C_INIT) || isMyUnit(fpRequest->r_unit)) {
             fpRequest->r_status = currentFunction();
         } else {
             // This is  not for me to handle
+            writeLog(&myDrive.sectors[29], "SD: DeviceInterrupt not for me command: %d r_unit: %d isMyUnit(): %d r_status: %d r_length: %x\n",
+           fpRequest->r_command, fpRequest->r_unit, isMyUnit(fpRequest->r_unit), fpRequest->r_status, fpRequest->r_length);
             struct device_header __far *deviceHeader = MK_FP(getCS(), 0);
             struct device_header __far *nextDeviceHeader = deviceHeader->dh_next;
             nextDeviceHeader->dh_interrupt();
@@ -328,8 +325,15 @@ void __far DeviceInterrupt( void )
 void __far DeviceStrategy( request __far *req )
 #pragma aux DeviceStrategy __parm [__es __bx]
 {
-    fpRequest = req;
 
+    fpRequest = req;
+     writeLog(&myDrive.sectors[31], "SD: DeviceStrategy command: %d r_unit: %d r_status: %d r_length: %x fpRequest: %x:%x\n",
+           req->r_command, req->r_unit, req->r_status, req->r_length, FP_SEG(fpRequest), FP_OFF(fpRequest));
+
+    // int written = snprintf(buffer, sizeof(buffer), "SD: DeviceStrategy command: %d r_unit: %d r_status: %d r_length: %x\n",
+    //     req->r_command, req->r_unit, req->r_status, req->r_length);
+   
+    
     // struct ALL_REGS registers;
     // get_all_registers(&registers);
 
@@ -339,7 +343,7 @@ void __far DeviceStrategy( request __far *req )
     // cdprintf("SD: command: %d r_unit: %d\n", req->r_command, req->r_unit);
     // cdprintf("SD: dh_name: %s\n", deviceHeader->dh_name);
     // cdprintf("SD: dh_next: %x\n", deviceHeader->dh_next);
-    // if ( ! is_my_unit(req->r_unit)) {
+    // if ( ! isMyUnit(req->r_unit)) {
     //     // This is  not for me to handle
     //     struct device_header __far *nextDeviceHeader = deviceHeader->dh_next;
     //     nextDeviceHeader->dh_strategy();
