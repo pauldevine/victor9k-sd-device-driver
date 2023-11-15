@@ -65,6 +65,11 @@ static uint8_t partition_number;
 // Place here any variables or constants that should go away after initialization
 //
 static char hellomsg[] = "\r\nDOS Device Driver Template in Open Watcom C\r\n$";
+extern bpb my_bpb;
+extern bpb near *my_bpb_ptr;
+extern MiniDrive  myDrive;
+extern bpbtbl_t far *my_bpbtbl_ptr;
+extern bool initNeeded;
 
 /*   WARNING!!  WARNING!!  WARNING!!  WARNING!!  WARNING!!  WARNING!!   */
 /*                         */
@@ -86,7 +91,7 @@ static char hellomsg[] = "\r\nDOS Device Driver Template in Open Watcom C\r\n$";
 /* and make contact with the SD card, and then return a table of BPBs to   */
 /* DOS.  If we can't communicate with the drive, then the entire driver */
 /* is unloaded from memory.                  */
-uint16_t device_init( void )
+uint16_t deviceInit( void )
 {
     struct ALL_REGS registers;
     uint16_t offset;
@@ -94,11 +99,7 @@ uint16_t device_init( void )
     void (__interrupt far *reboot_address)();  /* Reboot vector */
     bpb far *bpb_ptr;
     char far *bpb_cast_ptr;
-    uint8_t i;
-    extern bpb my_bpb;
-    extern bpb near *my_bpb_ptr;
-    extern MiniDrive my_drive;
-    extern bpbtbl_t far *my_bpbtbl_ptr;
+    
 
     get_all_registers(&registers);
 
@@ -111,7 +112,7 @@ uint16_t device_init( void )
 
 
     //address to find passed by DOS in a combo of ES / BX registers
-    
+    cdprintf("SD:  myDrive = %4x:%4x\n", FP_SEG( &myDrive), FP_OFF( &myDrive));
     cdprintf("about to parse bpb, ES: %x BX: %x\n", registers.es, registers.bx);
     cdprintf("SD: command: %d r_unit: %d\n", fpRequest->r_command, fpRequest->r_unit);
     cdprintf("SD: dh_num_drives: %d\n", dev_header->dh_num_drives);
@@ -149,7 +150,7 @@ uint16_t device_init( void )
     cdprintf("SD: done parsing getCS() = %4x:%4x\n", FP_SEG(getCS()), FP_OFF(&transient_data));
 
     if (true) {
-        cdprintf("SD: ramdrive allocation succeeded. Total Size: %d KB\n", (sizeof(my_drive.sectors)/1024));
+        cdprintf("SD: ramdrive allocation succeeded. Total Size: %d KB\n", (sizeof( myDrive.sectors)/1024));
     } else {
         cdprintf("SD: ramdrive allocation failed.\n");
     }
@@ -177,14 +178,27 @@ uint16_t device_init( void )
     // my_bpb_ptr->bpb_hidden = 0;
     // my_bpb_ptr->bpb_huge = 0;
 
+    //set &myDrive.sectors[0] to contain the BpB
+    //configure the empty FAT tables for the RAM drive
+    myDrive.sectors[1].data[0] = 0xF0;
+    myDrive.sectors[1].data[1] = 0xFF;
+    myDrive.sectors[1].data[2] = 0xFF;
+
+    myDrive.sectors[2].data[0] = 0xF0;
+    myDrive.sectors[2].data[1] = 0xFF;
+    myDrive.sectors[2].data[2] = 0xFF;
+
     cdprintf("SD: my_bpb_ptr = %4x:%4x\n", FP_SEG(my_bpb_ptr), FP_OFF(my_bpb_ptr));
 
     // /* All is well.  Tell DOS how many units and the BPBs... */
-    cdprintf("SD: initialized on DOS drive %c\n",(fpRequest->r_firstunit + 'A'));
+    cdprintf("SD: initialized on DOS drive %c r_firstunit: %d r_nunits: %d\n",(fpRequest->r_firstunit + 'A'), 
+        fpRequest->r_firstunit, fpRequest->r_nunits);
+    uint8_t i;
     for (i=0; i < fpRequest->r_nunits; i++) {
-        cdprintf("SD:  my_units[%d]: %d\n",(i,fpRequest->r_firstunit + i));
-        my_units[i] = fpRequest->r_firstunit + i;
+        cdprintf("SD:  my_units[%d]: %d drive %c\n",i, i, (fpRequest->r_firstunit + 'A'));
+        my_units[i] = i;
     }
+    initNeeded = false;
 
     if (debug)
     {   
