@@ -66,17 +66,17 @@ static uint16_t close( void )
 /* response.  This works well enough...                                */
 static uint16_t mediaCheck (void)
 {
-  struct ALL_REGS registers;
-  get_all_registers(&registers);
+  // struct ALL_REGS registers;
+  // get_all_registers(&registers);
   // mediaCheck_data far *media_ptr;
   //cdprintf("SD: mediaCheck()\n");
   //cdprintf("about to parse mediaCheck, ES: %x BX: %x\n", registers.es, registers.bx);
   //fpRequest->r_mediaCheck = MK_FP(registers.es, registers.bx);
   //cdprintf("SD: mediaCheck: unit=%x\n", fpRequest->r_mc_vol_id);
   
-  writeLog(&myDrive.sectors[28], "SD: mediaCheck(): r_unit %x media_descriptor = %x fpRequest->r_mc_ret_code = %x es: %x bx: %x r_mc_media_desc: %x:%x\n", 
-    fpRequest->r_unit, fpRequest->r_mc_media_desc, M_NOT_CHANGED, registers.es, registers.bx, 
-    FP_SEG(fpRequest->r_mc_media_desc), FP_OFF(fpRequest->r_mc_media_desc));
+  writeToDriveLog(&myDrive, "SD: mediaCheck(): r_unit %x media_descriptor = %x r_mc_red_code: %d fpRequest: %x:%x\n", 
+    fpRequest->r_unit, fpRequest->r_mc_media_desc, M_NOT_CHANGED,
+    FP_SEG(fpRequest), FP_OFF(fpRequest));
  
   fpRequest->r_mc_ret_code = M_NOT_CHANGED;
   //fpRequest->r_mc_ret_code = sd_mediaCheck(*fpRequest->r_mc_vol_id) ? M_CHANGED : M_NOT_CHANGED;
@@ -93,7 +93,7 @@ static uint16_t buildBpb (void)
   // cdprintf("SD: buildBpb()\n");
   // if (debug)
   //     cdprintf("SD: buildBpb: unit=%x\n", fpRequest->r_bpmdesc);
-  writeLog(&myDrive.sectors[27], "SD: buildBpb(): unit=%x\n", fpRequest->r_bpmdesc);
+  writeToDriveLog(&myDrive, "SD: buildBpb(): unit=%x\n", fpRequest->r_bpmdesc);
   //we build the BPB during the deviceInit() method.
   return S_DONE;
 }
@@ -107,7 +107,7 @@ static uint16_t IOCTLInput(void)
     //fpRequest->r_v9k_disk_info_ptr = MK_FP(registers.ds, registers.dx);
 
     //cdprintf("SD: IOCTLInput()");
-    writeLog(&myDrive.sectors[26], "SD: IOCTLInput(): r_di_ioctl_type = %x\n", fpRequest->r_di_ioctl_type);
+    writeToDriveLog(&myDrive, "SD: IOCTLInput(): r_di_ioctl_type = %x\n", fpRequest->r_di_ioctl_type);
     {
         switch (fpRequest->r_di_ioctl_type)
         {
@@ -163,7 +163,7 @@ int dosError (int status)
     case RES_PARERR: return E_CRC_ERROR;
 
     default:
-    writeLog(&myDrive.sectors[25], "SD: unknown drive error - status = 0x%2x\n", status);
+    writeToDriveLog(&myDrive, "SD: unknown drive error - status = 0x%2x\n", status);
         return E_GENERAL_FAILURE;
   }
 }
@@ -179,7 +179,7 @@ static uint16_t readBlock (void)
 {
   // cdprintf("SD: readBlock()\n");
   if (debug) {
-    writeLog(&myDrive.sectors[24], "SD: read block: media_descriptor=%d, start=%d, count=%d, r_trans=%x:%x\n",
+    writeToDriveLog(&myDrive, "SD: read block: media_descriptor=%d, start=%d, count=%d, r_trans=%x:%x\n",
      fpRequest->r_meddesc, fpRequest->r_start, fpRequest->r_count, 
              FP_SEG(fpRequest->r_trans), FP_OFF(fpRequest->r_trans));
   }
@@ -209,9 +209,9 @@ static uint16_t readBlock (void)
 static uint16_t write_block (bool verify)
 {
     if (debug) {
-        writeLog(&myDrive.sectors[23], "SD: write block: unit=%d, start=%d, count=%d, r_trans=%x:%x\n",
+        writeToDriveLog(&myDrive, "SD: write block: media_desc=%d, start=%d, count=%d, r_trans=%x:%x verify: %d\n",
                  fpRequest->r_meddesc, fpRequest->r_start, fpRequest->r_count, 
-                 FP_SEG(fpRequest->r_trans), FP_OFF(fpRequest->r_trans));
+                 FP_SEG(fpRequest->r_trans), FP_OFF(fpRequest->r_trans), verify);
     }
     if (initNeeded) return (S_DONE | S_ERROR | E_NOT_READY); // Not initialized yet
 
@@ -299,16 +299,21 @@ void __far DeviceInterrupt( void )
     }
     else
     {
-        writeLog(&myDrive.sectors[30], "SD: DeviceInterrupt command: %d r_unit: %d isMyUnit(): %d r_status: %d r_length: %x initNeeded: %d\n",
+
+        writeToDriveLog(&myDrive, "SD: Sector r_command %d\n", fpRequest->r_command);
+        writeToDriveLog(&myDrive, "SD: Sector r_unit %d\n", fpRequest->r_unit);
+        writeToDriveLog(&myDrive, "SD: DeviceInterrupt command: %d r_unit: %d isMyUnit(): %d r_status: %d r_length: %x initNeeded: %d\n",
            fpRequest->r_command, fpRequest->r_unit, isMyUnit(fpRequest->r_unit), fpRequest->r_status, fpRequest->r_length, initNeeded);
+        // writeToDriveLog(&myDrive, "SD: DeviceInterrupt command: %d r_unit: %d isMyUnit(): %d r_status: %d r_length: %x initNeeded: %d\n",
+        //    fpRequest->r_command, fpRequest->r_unit, isMyUnit(fpRequest->r_unit), fpRequest->r_status, fpRequest->r_length, initNeeded);
        // cdprintf("SD: command: %d r_unit: %d isMyUnit(): %d\n", fpRequest->r_command, fpRequest->r_unit, isMyUnit(fpRequest->r_unit));
         
         if ((initNeeded && fpRequest->r_command == C_INIT) || isMyUnit(fpRequest->r_unit)) {
             fpRequest->r_status = currentFunction();
         } else {
             // This is  not for me to handle
-            writeLog(&myDrive.sectors[29], "SD: DeviceInterrupt not for me command: %d r_unit: %d isMyUnit(): %d r_status: %d r_length: %x\n",
-           fpRequest->r_command, fpRequest->r_unit, isMyUnit(fpRequest->r_unit), fpRequest->r_status, fpRequest->r_length);
+           //  writeLog(&myDrive.sectors[29], "SD: DeviceInterrupt not for me command: %d r_unit: %d isMyUnit(): %d r_status: %d r_length: %x\n",
+           // fpRequest->r_command, fpRequest->r_unit, isMyUnit(fpRequest->r_unit), fpRequest->r_status, fpRequest->r_length);
             struct device_header __far *deviceHeader = MK_FP(getCS(), 0);
             struct device_header __far *nextDeviceHeader = deviceHeader->dh_next;
             nextDeviceHeader->dh_interrupt();
@@ -327,9 +332,8 @@ void __far DeviceStrategy( request __far *req )
 {
 
     fpRequest = req;
-     writeLog(&myDrive.sectors[31], "SD: DeviceStrategy command: %d r_unit: %d r_status: %d r_length: %x fpRequest: %x:%x\n",
+     writeToDriveLog(&myDrive, "SD: DeviceStrategy command: %d r_unit: %d r_status: %d r_length: %x fpRequest: %x:%x\n",
            req->r_command, req->r_unit, req->r_status, req->r_length, FP_SEG(fpRequest), FP_OFF(fpRequest));
-
     // int written = snprintf(buffer, sizeof(buffer), "SD: DeviceStrategy command: %d r_unit: %d r_status: %d r_length: %x\n",
     //     req->r_command, req->r_unit, req->r_status, req->r_length);
    

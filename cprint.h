@@ -61,8 +61,9 @@ void outstr (char *p);
 void outdec (int val);
 void outhex (unsigned val, int ndigits);
 void outcrlf (void);
-char* intToAscii(int value, char* buffer);
+char* intToAscii(int32_t value, char *buffer, size_t bufferSize);
 void writeLog(Sector *sector, const char *format, ...);
+void writeToDriveLog(MiniDrive *drive, const char* format, ...);
 void strreverse(char* begin, char* end);
 void cdprintf (char *msg, ...);
 #endif

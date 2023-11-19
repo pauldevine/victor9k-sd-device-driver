@@ -28,31 +28,186 @@
 
 #include <stdio.h>      /* NULL, etc...            */
 #include <stdint.h>
+#include <stdbool.h>
 #include <dos.h>        /* used only for MK_FP !      */
 #include <stdarg.h>     /* needed for variable argument lists  */
+#include <string.h>
 
-#include "device.h"
 #include "cprint.h"     /* Console printing */
 
+char* intToAscii(int32_t value, char *buffer, size_t bufferSize) {
+    if (bufferSize == 0) return NULL;   // Safety check
+    char* p = buffer + bufferSize - 1;  // Start at the end of the buffer
+    *p = '\0';  // Null-terminate the string
 
-char* intToAscii(int value, char* buffer) {
-    char temp[20];
-    char *tp = temp;
-    char *p = buffer;
-    int i;
-    long v = value >= 0 ? value : -value;
-
-    while (v || tp == temp) {
-        i = v % 10;
-        v /= 10;
-        *tp++ = '0' + i;
+    // Handle zero explicitly, since the loop below won't handle it
+    if (value == 0) {
+        *--p = '0';
     }
 
-    if (value < 0) *p++ = '-';
-    while (tp > temp) *p++ = *--tp;
+    // Handle negative numbers
+    bool isNegative = false;
+    if (value < 0) {
+        isNegative = true;
+        value = -value;  // Make the value positive for processing
+    }
 
-    return buffer;
+    // Convert the number to ASCII
+    while (value != 0) {
+        *--p = '0' + (value % 10);
+        value /= 10;
+    }
+
+    // Add minus sign for negative numbers
+    if (isNegative) {
+        *--p = '-';
+    }
+
+    // Return a pointer to the start of the ASCII representation
+    return p;
 }
+
+void writeToDriveLog(MiniDrive *drive, const char* format, ...) {
+    static size_t currentPos = 5 * SECTOR_SIZE;  // Start after the 5th sector
+    char buffer[SECTOR_SIZE];  // Temporary buffer for formatted string
+    char *bufferPtr = buffer;
+    uint16_t remainingSize = SECTOR_SIZE;  // Remaining space in the buffer
+
+    //insert some spacers just to help readability of log
+    uint8_t delimeter = 3;
+    for (uint8_t i =0; i<delimeter; i++) {
+        *bufferPtr++ = ' ';
+        remainingSize--;    
+    }
+    *bufferPtr++ = '|';
+    
+    va_list args;
+    va_start(args, format);
+
+    const char *p = format;
+    while (*p && remainingSize > 0) {
+        if (*p == '%') {
+            switch (*++p) {
+                case 'd': {
+                    int16_t num = va_arg(args, int16_t);
+                    char numStr[12];  // Enough for 32-bit int, sign, and null terminator
+                    char *str = intToAscii(num, (char *)numStr, sizeof(numStr));
+                    while (*str && remainingSize > 0) {
+                        *bufferPtr++ = *str++;
+                        remainingSize--;
+                    }
+                    break;
+                }
+                case 's': {
+                    char *str = va_arg(args, char*);
+                    while (*str && remainingSize > 0) {
+                        *bufferPtr++ = *str++;
+                        remainingSize--;
+                    }
+                    break;
+                }
+                case 'x': { // handle 16-bit hex number
+                    uint16_t val = (uint16_t)va_arg(args, int); // Promoted to int, then cast to 16-bit
+                    for (int i = (sizeof(uint16_t) * 2) - 1; i >= 0; i--) {
+                        uint8_t digit = (val >> (4 * i)) & 0xF;
+                        if (digit > 9) *bufferPtr++ = 'A' + digit - 10;
+                        else *bufferPtr++ = '0' + digit;
+                    }
+                    break;
+                }
+                case 'X': { // handle 32-bit hex number
+                    uint32_t val = va_arg(args, uint32_t);
+                    for (int i = (sizeof(uint32_t) * 2) - 1; i >= 0; i--) {
+                        uint8_t digit = (val >> (4 * i)) & 0xF;
+                        if (digit > 9) *bufferPtr++ = 'A' + digit - 10;
+                        else *bufferPtr++ = '0' + digit;
+                    }
+                    break;
+                }
+
+                case 'p': {
+                    // Retrieve the pointer once and extract segment and offset
+                    void far *ptr = va_arg(args, void*);
+                    uint16_t seg = FP_SEG(ptr);
+                    uint16_t off = FP_OFF(ptr);
+
+                    // Calculate linear address (segment*16 + offset)
+                    uint32_t linearAddr = ((uint32_t)seg << 4) + off;
+
+                    // Convert segment to hexadecimal
+                    for (int32_t i = (sizeof(uint16_t) * 2) - 1; i >= 0; i--) {
+                        uint16_t digit = (seg >> (4 * i)) & 0xF;
+                        *bufferPtr++ = digit > 9 ? 'A' + digit - 10 : '0' + digit;
+                    }
+                    *bufferPtr++ = ':';
+
+                    // Convert offset to hexadecimal
+                    for (int32_t i = (sizeof(uint16_t) * 2) - 1; i >= 0; i--) {
+                        uint16_t digit = (off >> (4 * i)) & 0xF;
+                        *bufferPtr++ = digit > 9 ? 'A' + digit - 10 : '0' + digit;
+                    }
+
+                    // Add space for readability
+                    *bufferPtr++ = ' ';
+                    *bufferPtr++ = '=';
+
+                    // Convert linear address to hexadecimal
+                    for (int32_t i = (sizeof(uint32_t) * 2) - 1; i >= 0; i--) {
+                        uint32_t digit = (linearAddr >> (4 * i)) & 0xF;
+                        *bufferPtr++ = digit > 9 ? 'A' + digit - 10 : '0' + digit;
+                    }
+                    break;
+                }
+                case 'L': {  // Custom specifier for int32_t
+                    int32_t longNum = va_arg(args, int32_t);
+                    char longNumStr[12];  // Enough for 32-bit int, sign, and null terminator
+                    char *str = intToAscii(longNum, longNumStr, sizeof(longNumStr));
+                    while (*str && remainingSize > 0) {
+                        *bufferPtr++ = *str++;
+                        remainingSize--;
+                    }
+                    break;
+                }
+                // Add other format specifiers as needed
+                default:
+                    if (remainingSize > 1) {
+                        *bufferPtr++ = '%';
+                        *bufferPtr++ = *p;
+                        remainingSize -= 2;
+                    }
+                    break;
+            }
+        } else {
+            *bufferPtr++ = *p;
+            remainingSize--;
+        }
+        p++;
+    }
+
+    *bufferPtr = '\0'; // Null-terminate the buffer
+    va_end(args);
+
+    size_t messageLen = bufferPtr - buffer;
+
+    // Calculate the total size of the drive in bytes
+    size_t totalDriveSize = NUM_SECTORS * SECTOR_SIZE;
+
+    // Check if there's enough space left in the drive
+    if (currentPos + messageLen >= totalDriveSize) {
+        // Handle the case where the drive is full
+        return;
+    }
+
+    // Cast the drive to a char pointer
+    char* drivePtr = (char*)drive->sectors;
+
+    // Write the formatted message to the current position
+    memcpy(drivePtr + currentPos, buffer, messageLen);
+
+    // Update the current position
+    currentPos += messageLen;
+}
+
 
 // A very simple version of a function similar to sprintf
 // Writes a formatted string to a sector's data buffer.
@@ -68,17 +223,18 @@ void writeLog(Sector *sector, const char *format, ...) {
         if (*p == '%') {
             switch (*++p) {
                 case 'd': { // Handle decimal integer
-                    int num = va_arg(args, int);
-                    char *n = intToAscii(num, buffer); // Convert integer to string
+                    int16_t num = va_arg(args, int16_t);
+                    char *numStr[12];  // Enough for 32-bit int, sign, and null terminator
+                    char *n = intToAscii(num, (char *)numStr, sizeof(numStr));
                     while (*n) {
                         *buffer++ = *n++; // Copy number to buffer
                     }
                     break;
                 }
                 case 'x': { // handle hex number
-                    unsigned int val = va_arg(args, unsigned int);
-                    for (int i = (sizeof(unsigned int) * 2) - 1; i >= 0; i--) {
-                        int digit = (val >> (4 * i)) & 0xF;
+                    int16_t val = va_arg(args, int);
+                    for (int16_t i = (sizeof(int16_t) * 2) - 1; i >= 0; i--) {
+                        int16_t digit = (val >> (4 * i)) & 0xF;
                         if (digit > 9) *buffer++ = 'A' + digit - 10;
                         else *buffer++ = '0' + digit;
                     }
@@ -88,6 +244,57 @@ void writeLog(Sector *sector, const char *format, ...) {
                     char *str = va_arg(args, char*);
                     while (*str) {
                         *buffer++ = *str++; // Copy string to buffer
+                    }
+                    break;
+                }
+                case 'X': { // handle 32-bit hex number
+                    uint32_t val = va_arg(args, uint32_t);
+                    for (int i = (sizeof(uint32_t) * 2) - 1; i >= 0; i--) {
+                        uint8_t digit = (val >> (4 * i)) & 0xF;
+                        if (digit > 9) *buffer++ = 'A' + digit - 10;
+                        else *buffer++ = '0' + digit;
+                    }
+                    break;
+                }
+                case 'p': {
+                    // Retrieve the pointer once and extract segment and offset
+                    void far *ptr = va_arg(args, void*);
+                    uint16_t seg = FP_SEG(ptr);
+                    uint16_t off = FP_OFF(ptr);
+
+                    // Calculate linear address (segment*16 + offset)
+                    uint32_t linearAddr = ((uint32_t)seg << 4) + off;
+
+                    // Convert segment to hexadecimal
+                    for (int32_t i = (sizeof(uint16_t) * 2) - 1; i >= 0; i--) {
+                        uint16_t digit = (seg >> (4 * i)) & 0xF;
+                        *buffer++ = digit > 9 ? 'A' + digit - 10 : '0' + digit;
+                    }
+                    *buffer++ = ':';
+
+                    // Convert offset to hexadecimal
+                    for (int32_t i = (sizeof(uint16_t) * 2) - 1; i >= 0; i--) {
+                        uint16_t digit = (off >> (4 * i)) & 0xF;
+                        *buffer++ = digit > 9 ? 'A' + digit - 10 : '0' + digit;
+                    }
+
+                    // Add space for readability
+                    *buffer++ = ' ';
+                    *buffer++ = '=';
+
+                    // Convert linear address to hexadecimal
+                    for (int32_t i = (sizeof(uint32_t) * 2) - 1; i >= 0; i--) {
+                        uint32_t digit = (linearAddr >> (4 * i)) & 0xF;
+                        *buffer++ = digit > 9 ? 'A' + digit - 10 : '0' + digit;
+                    }
+                    break;
+                }
+                case 'L': {  // Custom specifier for int32_t
+                    int32_t longNum = va_arg(args, int32_t);
+                    char longNumStr[12];  // Enough for 32-bit int, sign, and null terminator
+                    char *str = intToAscii(longNum, longNumStr, sizeof(longNumStr));
+                    while (*str) {
+                        *buffer++ = *str++;
                     }
                     break;
                 }

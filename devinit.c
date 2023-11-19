@@ -189,6 +189,14 @@ uint16_t deviceInit( void )
     myDrive.sectors[2].data[2] = 0xFF;
 
     cdprintf("SD: my_bpb_ptr = %4x:%4x\n", FP_SEG(my_bpb_ptr), FP_OFF(my_bpb_ptr));
+    cdprintf("SD: myDrive = %4x:%4x\n", FP_SEG(&myDrive), FP_OFF(&myDrive));
+    cdprintf("SD: myDrive.sector = %4x:%4x\n", FP_SEG(myDrive.sectors), FP_OFF(myDrive.sectors));
+    cdprintf("SD: myDrive.sectors[31] = %4x:%4x\n", FP_SEG(&myDrive.sectors[31]), FP_OFF(&myDrive.sectors[31]));
+    cdprintf("SD: myDrive.sectors[31].data = %4x:%4x\n", FP_SEG(&myDrive.sectors[31].data), FP_OFF(&myDrive.sectors[31].data));
+    uint32_t currentPos = 5 * 512;  // Start after the 5th sector
+    char far *bytePointer = (char *)&myDrive;
+    cdprintf("writeToDriveLog location %4x:%4x", FP_SEG(bytePointer + currentPos), FP_SEG(bytePointer + currentPos));
+    
 
     // /* All is well.  Tell DOS how many units and the BPBs... */
     cdprintf("SD: initialized on DOS drive %c r_firstunit: %d r_nunits: %d\n",(fpRequest->r_firstunit + 'A'), 
@@ -199,6 +207,7 @@ uint16_t deviceInit( void )
         my_units[i] = i;
     }
     initNeeded = false;
+
 
     if (debug)
     {   

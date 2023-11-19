@@ -408,8 +408,6 @@ typedef struct {
   uint8_t __far * _r_trans;     /*  Transfer Address    */
   uint16_t _r_count;           /*  Byte/Sector Count   */
   uint16_t _r_start;           /*  Starting Sector No. */
-  uint8_t __far * _r_vol_id;    /* Pointer to volume id */
-  uint32_t _r_huge;             /* for > 32Mb drives    */
 } read_write;
 
 typedef struct {
