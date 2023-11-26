@@ -32,6 +32,9 @@
  */
 
 #ifndef _CPRINT_H
+
+#include "device.h"
+
 #define _CPRINT_H
 #define PHASE2_DEVICE_SEGMENT 0xE800
 #define CONTRAST_BRIGHTNESS_REG_OFFSET 0x0040
@@ -58,5 +61,9 @@ void outstr (char *p);
 void outdec (int val);
 void outhex (unsigned val, int ndigits);
 void outcrlf (void);
-void cdprintf (char near *msg, ...);
+char* intToAscii(int32_t value, char *buffer, size_t bufferSize);
+void writeLog(Sector *sector, const char *format, ...);
+void writeToDriveLog(MiniDrive *drive, const char* format, ...);
+void strreverse(char* begin, char* end);
+void cdprintf (char *msg, ...);
 #endif

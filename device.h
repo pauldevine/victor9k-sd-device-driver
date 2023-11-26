@@ -140,7 +140,7 @@
  *      structures
  */
 
-#pragma pack( push, 1)
+#pragma pack(1)
 
 /* Device header */
 
@@ -201,10 +201,10 @@ typedef struct {
   uint16_t bpb_nsize;              /* Size in sectors              */ 
   uint8_t bpb_mdesc;              /* MEDIA Descriptor Byte        */
   uint16_t bpb_nfsect;             /* FAT size in sectors          */
-  uint16_t bpb_nsecs;              /* Sectors per track            */
-  uint16_t bpb_nheads;             /* Number of heads              */
-  uint32_t bpb_hidden;             /* Hidden sectors               */
-  uint32_t bpb_huge;               /* Size in sectors if           */
+  // uint16_t bpb_nsecs;              /* Sectors per track            */
+  // uint16_t bpb_nheads;             /* Number of heads              */
+  // uint32_t bpb_hidden;             /* Hidden sectors               */
+  // uint32_t bpb_huge;               /* Size in sectors if           */
   /* bpb_nsize == 0               */
 #ifdef WITHFAT32
   uint32_t bpb_xnfsect;            /* FAT size in sectors if       */
@@ -408,14 +408,11 @@ typedef struct {
   uint8_t __far * _r_trans;     /*  Transfer Address    */
   uint16_t _r_count;           /*  Byte/Sector Count   */
   uint16_t _r_start;           /*  Starting Sector No. */
-  uint8_t __far * _r_vol_id;    /* Pointer to volume id */
-  uint32_t _r_huge;             /* for > 32Mb drives    */
 } read_write;
 
 typedef struct {
   uint8_t _r_media_desc;          /*  MEDIA Descriptor    */
   uint8_t _r_ret_code;          /*  Return Code         */
-  uint8_t __far * _r_vol_id;        /* volume id */
 } media_check_data;
 
 typedef boot super;             /* Alias for boot structure             */
@@ -481,7 +478,6 @@ typedef struct {
 #define r_media_check   _r_x._r_media_ptr
 #define r_mc_media_desc _r_x._r_media_ptr->_r_media_desc
 #define r_mc_ret_code   _r_x._r_media_ptr->_r_ret_code
-#define r_mc_vol_id     _r_x._r_media_ptr->_r_vol_id
 
 /* Build BPB packet macros                                              */
 #define r_bpmdesc       _r_x._r_bpb._r_meddesc
@@ -494,8 +490,6 @@ typedef struct {
 #define r_trans         _r_x._r_rw_ptr->_r_trans
 #define r_count         _r_x._r_rw_ptr->_r_count
 #define r_start         _r_x._r_rw_ptr->_r_start
-#define r_rw_vol_id     _r_x._r_rw_ptr->_r_vol_id
-#define r_huge          _r_x._r_rw_ptr->_r_huge
 
 /* ndread packet macros                                                 */
 #define r_ndbyte        _r_x._r_nd._r_ndbyte
