@@ -204,6 +204,8 @@ void writeToDriveLog(MiniDrive *drive, const char* format, ...) {
     // Write the formatted message to the current position
     memcpy(drivePtr + currentPos, buffer, messageLen);
 
+    cdprintf(buffer);
+
     // Update the current position
     currentPos += messageLen;
 }
