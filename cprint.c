@@ -35,6 +35,38 @@
 
 #include "cprint.h"     /* Console printing */
 
+#define LOG_SECTOR_START 16 // Start log file at the 16th sector
+#define BUFFER_SIZE ((NUM_SECTORS - LOG_SECTOR_START) * SECTOR_SIZE)
+
+extern MiniDrive  myDrive;
+
+char* logBuffer = (char*)(&myDrive.sectors[LOG_SECTOR_START]);
+static size_t head = 0;  
+static size_t tail = BUFFER_SIZE - 1; // Points to the end of the logBuffer
+
+void writeBuffer(char *data) {  
+   
+    int i = 0;
+    while(data[i] != '\0') {
+        logBuffer[head] = data[i];
+        head = (head + 1) % BUFFER_SIZE;
+        if (head == tail) {
+            head = 0; // Overwrite old data
+        }
+        i++;
+    }
+}
+
+void readBuffer(char *output, int maxSize) {
+    int i = 0;
+    while (tail != head && i < maxSize - 1) {
+        output[i] = logBuffer[tail];
+        tail = (tail + 1) % BUFFER_SIZE;
+        i++;
+    }
+    output[i] = '\0';
+}
+
 char* intToAscii(int32_t value, char *buffer, size_t bufferSize) {
     if (bufferSize == 0) return NULL;   // Safety check
     char* p = buffer + bufferSize - 1;  // Start at the end of the buffer
@@ -67,19 +99,28 @@ char* intToAscii(int32_t value, char *buffer, size_t bufferSize) {
     return p;
 }
 
-void writeToDriveLog(MiniDrive *drive, const char* format, ...) {
-    static size_t currentPos = 5 * SECTOR_SIZE;  // Start after the 5th sector
+void writeToDriveLog(const char* format, ...) {
     char buffer[SECTOR_SIZE];  // Temporary buffer for formatted string
     char *bufferPtr = buffer;
     uint16_t remainingSize = SECTOR_SIZE;  // Remaining space in the buffer
+    static uint8_t logNum = 0;  // Log number
+    logNum++;
 
     //insert some spacers just to help readability of log
-    uint8_t delimeter = 3;
+    uint8_t delimeter = 2;
     for (uint8_t i =0; i<delimeter; i++) {
         *bufferPtr++ = ' ';
         remainingSize--;    
     }
+    
+    char logNumStr[12];  // Enough for 32-bit int, sign, and null terminator
+    char *logStr = intToAscii(logNum, (char *)logNumStr, sizeof(logNumStr));
+    while (*logStr && remainingSize > 0) {
+        *bufferPtr++ = *logStr++;
+        remainingSize--;
+    }
     *bufferPtr++ = '|';
+    remainingSize--;
     
     va_list args;
     va_start(args, format);
@@ -189,25 +230,11 @@ void writeToDriveLog(MiniDrive *drive, const char* format, ...) {
 
     size_t messageLen = bufferPtr - buffer;
 
-    // Calculate the total size of the drive in bytes
-    size_t totalDriveSize = NUM_SECTORS * SECTOR_SIZE;
-
-    // Check if there's enough space left in the drive
-    if (currentPos + messageLen >= totalDriveSize) {
-        // Handle the case where the drive is full
-        return;
-    }
-
-    // Cast the drive to a char pointer
-    char* drivePtr = (char*)drive->sectors;
 
     // Write the formatted message to the current position
-    memcpy(drivePtr + currentPos, buffer, messageLen);
+    writeBuffer(buffer);
 
-    cdprintf(buffer);
-
-    // Update the current position
-    currentPos += messageLen;
+    //cdprintf(buffer);
 }
 
 

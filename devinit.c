@@ -191,6 +191,9 @@ uint16_t deviceInit( void )
     cdprintf("SD: my_bpb_ptr = %4x:%4x\n", FP_SEG(my_bpb_ptr), FP_OFF(my_bpb_ptr));
     cdprintf("SD: myDrive = %4x:%4x\n", FP_SEG(&myDrive), FP_OFF(&myDrive));
     cdprintf("SD: myDrive.sector = %4x:%4x\n", FP_SEG(myDrive.sectors), FP_OFF(myDrive.sectors));
+    cdprintf("SD: myDrive.sectors[16] = %4x:%4x\n", FP_SEG(&myDrive.sectors[16]), FP_OFF(&myDrive.sectors[16]));
+    uint32_t sector16 = FP_SEG(&myDrive.sectors[16]) + FP_OFF(&myDrive.sectors[16]);
+    cdprintf("SD: myDrive.sectors[16] = %5x\n", sector16);
     cdprintf("SD: myDrive.sectors[31] = %4x:%4x\n", FP_SEG(&myDrive.sectors[31]), FP_OFF(&myDrive.sectors[31]));
     cdprintf("SD: myDrive.sectors[31].data = %4x:%4x\n", FP_SEG(&myDrive.sectors[31].data), FP_OFF(&myDrive.sectors[31].data));
     uint32_t currentPos = 5 * 512;  // Start after the 5th sector

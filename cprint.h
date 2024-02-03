@@ -63,7 +63,7 @@ void outhex (unsigned val, int ndigits);
 void outcrlf (void);
 char* intToAscii(int32_t value, char *buffer, size_t bufferSize);
 void writeLog(Sector *sector, const char *format, ...);
-void writeToDriveLog(MiniDrive *drive, const char* format, ...);
+void writeToDriveLog(const char* format, ...);
 void strreverse(char* begin, char* end);
 void cdprintf (char *msg, ...);
 #endif
