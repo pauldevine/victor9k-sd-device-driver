@@ -180,27 +180,43 @@ uint16_t deviceInit( void )
 
     //set &myDrive.sectors[0] to contain the BpB
     //configure the empty FAT tables for the RAM drive
-    myDrive.sectors[1].data[0] = 0xF0;
+    myDrive.sectors[1].data[0] = 0xF8;
     myDrive.sectors[1].data[1] = 0xFF;
     myDrive.sectors[1].data[2] = 0xFF;
 
-    myDrive.sectors[2].data[0] = 0xF0;
+    myDrive.sectors[2].data[0] = 0xF8;
     myDrive.sectors[2].data[1] = 0xFF;
     myDrive.sectors[2].data[2] = 0xFF;
+
+    uint8_t directory_entry[512] = {
+    0x4D, 0x41, 0x43, 0x48,   0x49, 0x4E, 0x45, 0x31,   0x42, 0x20, 0x20, 0x28,   0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,   0x00, 0x00, 0x6A, 0x91,   0x29, 0x54, 0x00, 0x00,   0x00, 0x00, 0x00, 0x00 };
+
+    // Start filling from the 32nd byte
+    for (uint16_t i = 31; i < 512;) { // Notice the increment part is empty
+        directory_entry[i] = 0x00; // Set the current byte to 0x00
+        i++;
+        for (uint16_t j = 0; j < 31 && i < 512; j++, i++) { // Also check i < 512 to avoid overflow
+            directory_entry[i] = 0x93;
+        }
+        cdprintf("%d ", i);
+
+    }
+
+    for (uint16_t i = 0; i < 512; i++) {
+        myDrive.sectors[3].data[i] = directory_entry[i];
+    }
 
     cdprintf("SD: my_bpb_ptr = %4x:%4x\n", FP_SEG(my_bpb_ptr), FP_OFF(my_bpb_ptr));
     cdprintf("SD: myDrive = %4x:%4x\n", FP_SEG(&myDrive), FP_OFF(&myDrive));
     cdprintf("SD: myDrive.sector = %4x:%4x\n", FP_SEG(myDrive.sectors), FP_OFF(myDrive.sectors));
     cdprintf("SD: myDrive.sectors[16] = %4x:%4x\n", FP_SEG(&myDrive.sectors[16]), FP_OFF(&myDrive.sectors[16]));
-    uint32_t sector16 = FP_SEG(&myDrive.sectors[16]) + FP_OFF(&myDrive.sectors[16]);
-    cdprintf("SD: myDrive.sectors[16] = %5x\n", sector16);
-    cdprintf("SD: myDrive.sectors[31] = %4x:%4x\n", FP_SEG(&myDrive.sectors[31]), FP_OFF(&myDrive.sectors[31]));
+    uint32_t sector16 = ((uint32_t)FP_SEG(&myDrive.sectors[16]) << 4) + (uint32_t)FP_OFF(&myDrive.sectors[16]);
+    cdprintf("SD: myDrive.sectors[16] = %X\n", sector16);
+    uint32_t sector31 = ((uint32_t)FP_SEG(&myDrive.sectors[31]) << 4) + (uint32_t)FP_OFF(&myDrive.sectors[31]);
+    cdprintf("SD: myDrive.sectors[31] = %X\n", sector31);
     cdprintf("SD: myDrive.sectors[31].data = %4x:%4x\n", FP_SEG(&myDrive.sectors[31].data), FP_OFF(&myDrive.sectors[31].data));
-    uint32_t currentPos = 5 * 512;  // Start after the 5th sector
-    char far *bytePointer = (char *)&myDrive;
-    cdprintf("writeToDriveLog location %4x:%4x", FP_SEG(bytePointer + currentPos), FP_SEG(bytePointer + currentPos));
     
-
     // /* All is well.  Tell DOS how many units and the BPBs... */
     cdprintf("SD: initialized on DOS drive %c r_firstunit: %d r_nunits: %d\n",(fpRequest->r_firstunit + 'A'), 
         fpRequest->r_firstunit, fpRequest->r_nunits);
