@@ -157,7 +157,7 @@ void writeToDriveLog(const char* format, ...) {
                     break;
                 }
                 case 'X': { // handle 32-bit hex number
-                    uint32_t val = va_arg(args, uint32_t);
+                    uint32_t val = (uint32_t)va_arg(args, uint32_t);
                     for (int i = (sizeof(uint32_t) * 2) - 1; i >= 0; i--) {
                         uint8_t digit = (val >> (4 * i)) & 0xF;
                         if (digit > 9) *bufferPtr++ = 'A' + digit - 10;
@@ -165,7 +165,6 @@ void writeToDriveLog(const char* format, ...) {
                     }
                     break;
                 }
-
                 case 'p': {
                     // Retrieve the pointer once and extract segment and offset
                     void far *ptr = va_arg(args, void*);
@@ -468,14 +467,21 @@ void outhex (unsigned val, int ndigits)
     outchr('0'+val);
 }
 
-/* outhex - print a n digit hex number with leading zeros */
-void outlhex (uint16_t lval)
+/* outhex16 - print a 4 digit hex number with leading zeros */
+void outhex16 (uint16_t lval)
 {
   int i;
-  for (i=3;i>=0;i--)
+  for (i=1;i>=0;i--)
      outhex(((unsigned char *)&lval)[i],2);
 }
 
+/* outhex32 - print a 8 digit hex number with leading zeros */
+void outhex32 (uint32_t ulval)
+{
+  int i;
+  for (i=3;i>=0;i--)
+     outhex(((unsigned char *)&ulval)[i],2);
+}
 
 /* outcrlf - print a carriage return, line feed pair */
 void outcrlf (void)
@@ -511,7 +517,12 @@ void cdprintln(const char* str) {
 /* recognized only for %x, and then may only be a single decimal digit. */
 void cdprintf (char *msg, ...)
 {
-  va_list ap;  char *str;  int size, ival;  unsigned uval; uint16_t luval;
+  va_list ap;  
+  char *str;  
+  int size, ival;  
+  unsigned uval; 
+  uint16_t luval;
+  uint32_t ulval;
   va_start (ap, msg);
 
   while (*msg != '\0') {
@@ -539,11 +550,16 @@ void cdprintf (char *msg, ...)
         uval = va_arg(ap, unsigned); 
         ++msg;
         outhex (uval,  (size > 0) ? size : 4);
+      } else if (*msg == 'X')
+      { // handle 32-bit hex number
+        ulval = va_arg(ap, uint32_t);
+        ++msg;
+        outhex32 (ulval);
       } else if (*msg == 'L') 
       {
         luval = va_arg(ap, uint16_t); 
         ++msg;
-        outlhex (luval);
+        outhex16 (luval);
       } else if (*msg == 's') {
         str = va_arg(ap, char *);  
         outstr (str);  
