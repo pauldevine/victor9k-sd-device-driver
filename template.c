@@ -74,7 +74,7 @@ static uint16_t mediaCheck (void)
   //fpRequest->r_mediaCheck = MK_FP(registers.es, registers.bx);
   //cdprintf("SD: mediaCheck: unit=%x\n", fpRequest->r_mc_vol_id);
   
-  writeToDriveLog("SD: mediaCheck(): r_unit %x media_descriptor = %x r_mc_red_code: %d fpRequest: %x:%x\n", 
+  writeToDriveLog("SD: mediaCheck(): r_unit 0x%xh media_descriptor = 0x%xh r_mc_red_code: %d fpRequest: %x:%x\n", 
     fpRequest->r_unit, fpRequest->r_mc_media_desc, M_NOT_CHANGED,
     FP_SEG(fpRequest), FP_OFF(fpRequest));
  
@@ -93,7 +93,7 @@ static uint16_t buildBpb (void)
   // cdprintf("SD: buildBpb()\n");
   // if (debug)
   //     cdprintf("SD: buildBpb: unit=%x\n", fpRequest->r_bpmdesc);
-  writeToDriveLog("SD: buildBpb(): unit=%x\n", fpRequest->r_bpmdesc);
+  writeToDriveLog("SD: buildBpb(): unit=0x%xh\n", fpRequest->r_bpmdesc);
   //we build the BPB during the deviceInit() method.
   return S_DONE;
 }
@@ -107,7 +107,7 @@ static uint16_t IOCTLInput(void)
     //fpRequest->r_v9k_disk_info_ptr = MK_FP(registers.ds, registers.dx);
 
     //cdprintf("SD: IOCTLInput()");
-    writeToDriveLog("SD: IOCTLInput(): r_di_ioctl_type = %x\n", fpRequest->r_di_ioctl_type);
+    writeToDriveLog("SD: IOCTLInput(): r_di_ioctl_type = 0x%xh\n", fpRequest->r_di_ioctl_type);
     {
         switch (fpRequest->r_di_ioctl_type)
         {
@@ -209,9 +209,10 @@ static uint16_t readBlock (void)
 static uint16_t write_block (bool verify)
 {
     if (debug) {
-        writeToDriveLog("SD: write block: media_desc=%d, start=%d, count=%d, r_trans=%x:%x verify: %d\n",
+        writeToDriveLog("SD: write block: media_desc=%d, start=%d, count=%d, r_trans=%x:%x verify: %d fpRequest: %x:%x\n",
                  fpRequest->r_meddesc, fpRequest->r_start, fpRequest->r_count, 
-                 FP_SEG(fpRequest->r_trans), FP_OFF(fpRequest->r_trans), verify);
+                 FP_SEG(fpRequest->r_trans), FP_OFF(fpRequest->r_trans), verify, 
+                 FP_SEG(fpRequest), FP_OFF(fpRequest));
     }
     if (initNeeded) return (S_DONE | S_ERROR | E_NOT_READY); // Not initialized yet
 
@@ -290,7 +291,6 @@ void __far DeviceInterrupt( void )
 #ifdef USE_INTERNAL_STACK
     switch_stack();
 #endif
-
     push_regs();
 
     if ( fpRequest->r_command > C_MAXCMD || NULL == (currentFunction = dispatchTable[fpRequest->r_command]) )
@@ -299,20 +299,12 @@ void __far DeviceInterrupt( void )
     }
     else
     {
-        writeToDriveLog("SD: Sector r_command %d\n", fpRequest->r_command);
-        writeToDriveLog("SD: Sector r_unit: %d r_command: %d\n", fpRequest->r_unit, fpRequest->r_command);
-        writeToDriveLog("SD: DeviceInterrupt command: %d r_unit: %d isMyUnit(): %d r_status: %d r_length: %x initNeeded: %d\n",
-           fpRequest->r_command, fpRequest->r_unit, isMyUnit(fpRequest->r_unit), fpRequest->r_status, fpRequest->r_length, initNeeded);
-        // writeToDriveLog("SD: DeviceInterrupt command: %d r_unit: %d isMyUnit(): %d r_status: %d r_length: %x initNeeded: %d\n",
-        //    fpRequest->r_command, fpRequest->r_unit, isMyUnit(fpRequest->r_unit), fpRequest->r_status, fpRequest->r_length, initNeeded);
-       // cdprintf("SD: command: %d r_unit: %d isMyUnit(): %d\n", fpRequest->r_command, fpRequest->r_unit, isMyUnit(fpRequest->r_unit));
-        
+        writeToDriveLog("SD: DeviceInterrupt command: %d r_unit: %d isMyUnit(): %d r_status: %d r_length: %d initNeeded: %d\n",
+            fpRequest->r_command, fpRequest->r_unit, isMyUnit(fpRequest->r_unit), fpRequest->r_status, fpRequest->r_length, initNeeded);   
         if ((initNeeded && fpRequest->r_command == C_INIT) || isMyUnit(fpRequest->r_unit)) {
             fpRequest->r_status = currentFunction();
         } else {
             // This is  not for me to handle
-           //  writeLog(&myDrive.sectors[29], "SD: DeviceInterrupt not for me command: %d r_unit: %d isMyUnit(): %d r_status: %d r_length: %x\n",
-           // fpRequest->r_command, fpRequest->r_unit, isMyUnit(fpRequest->r_unit), fpRequest->r_status, fpRequest->r_length);
             struct device_header __far *deviceHeader = MK_FP(getCS(), 0);
             struct device_header __far *nextDeviceHeader = deviceHeader->dh_next;
             nextDeviceHeader->dh_interrupt();
@@ -331,26 +323,8 @@ void __far DeviceStrategy( request __far *req )
 {
 
     fpRequest = req;
-     writeToDriveLog("SD: DeviceStrategy command: %d r_unit: %d r_status: %d r_length: %x fpRequest: %x:%x\n",
-           req->r_command, req->r_unit, req->r_status, req->r_length, FP_SEG(fpRequest), FP_OFF(fpRequest));
-    // int written = snprintf(buffer, sizeof(buffer), "SD: DeviceStrategy command: %d r_unit: %d r_status: %d r_length: %x\n",
-    //     req->r_command, req->r_unit, req->r_status, req->r_length);
-   
-    
-    // struct ALL_REGS registers;
-    // get_all_registers(&registers);
-
-    // struct device_header __far *deviceHeader = MK_FP(registers.cs, 0);
-    // fpRequest = MK_FP(registers.es, registers.bx);
-
-    // cdprintf("SD: command: %d r_unit: %d\n", req->r_command, req->r_unit);
-    // cdprintf("SD: dh_name: %s\n", deviceHeader->dh_name);
-    // cdprintf("SD: dh_next: %x\n", deviceHeader->dh_next);
-    // if ( ! isMyUnit(req->r_unit)) {
-    //     // This is  not for me to handle
-    //     struct device_header __far *nextDeviceHeader = deviceHeader->dh_next;
-    //     nextDeviceHeader->dh_strategy();
-    // }
+     // writeToDriveLog("SD: DeviceStrategy command: %d r_unit: %d r_status: %d r_length: %x fpRequest: %x:%x\n",
+     //       req->r_command, req->r_unit, req->r_status, req->r_length, FP_SEG(fpRequest), FP_OFF(fpRequest));
 
 }
 
