@@ -97,6 +97,7 @@ uint16_t deviceInit( void )
     uint16_t offset;
     uint16_t brkadr, reboot[2];  
     void (__interrupt far *reboot_address)();  /* Reboot vector */
+    bpb my_bpb;
     bpb far *bpb_ptr;
     char far *bpb_cast_ptr;
     
@@ -171,7 +172,7 @@ uint16_t deviceInit( void )
     my_bpb_ptr->bpb_nfat = 2;              /* Number of FAT copies */
     my_bpb_ptr->bpb_ndirent = 16;   
     my_bpb_ptr->bpb_nsize = 32;
-    my_bpb_ptr->bpb_mdesc = 0xFD;
+    my_bpb_ptr->bpb_mdesc = 0xF8;
     my_bpb_ptr->bpb_nfsect = 1;             /* Number of sectors per FAT */
     // my_bpb_ptr->bpb_nsecs = 8;     /* Number of sectors per track */
     // my_bpb_ptr->bpb_nheads = 1;     /* Number of heads */
@@ -180,11 +181,11 @@ uint16_t deviceInit( void )
 
     //set &myDrive.sectors[0] to contain the BpB
     //configure the empty FAT tables for the RAM drive
-    myDrive.sectors[1].data[0] = 0xF8;
+    myDrive.sectors[1].data[0] = 0xF0;
     myDrive.sectors[1].data[1] = 0xFF;
     myDrive.sectors[1].data[2] = 0xFF;
 
-    myDrive.sectors[2].data[0] = 0xF8;
+    myDrive.sectors[2].data[0] = 0xF0;
     myDrive.sectors[2].data[1] = 0xFF;
     myDrive.sectors[2].data[2] = 0xFF;
 
@@ -193,7 +194,7 @@ uint16_t deviceInit( void )
     0x00, 0x00, 0x00, 0x00,   0x00, 0x00, 0x6A, 0x91,   0x29, 0x54, 0x00, 0x00,   0x00, 0x00, 0x00, 0x00 };
 
     // Start filling from the 32nd byte
-    for (uint16_t i = 31; i < 512;) { // Notice the increment part is empty
+    for (uint16_t i = 32; i < 512;) { // Notice the increment part is empty
         directory_entry[i] = 0x00; // Set the current byte to 0x00
         i++;
         for (uint16_t j = 0; j < 31 && i < 512; j++, i++) { // Also check i < 512 to avoid overflow
@@ -207,15 +208,25 @@ uint16_t deviceInit( void )
         myDrive.sectors[3].data[i] = directory_entry[i];
     }
 
-    cdprintf("SD: my_bpb_ptr = %4x:%4x\n", FP_SEG(my_bpb_ptr), FP_OFF(my_bpb_ptr));
-    cdprintf("SD: myDrive = %4x:%4x\n", FP_SEG(&myDrive), FP_OFF(&myDrive));
+    uint32_t bpb_start = calculateLinearAddress(FP_SEG(my_bpb_ptr) , FP_OFF(my_bpb_ptr));
+    cdprintf("SD: my_bpb_ptr = %4x:%4x  %5X\n", FP_SEG(my_bpb_ptr), FP_OFF(my_bpb_ptr), bpb_start);
+    writeToDriveLog("SD: my_bpb_ptr = %4x:%4x  %5X\n", FP_SEG(my_bpb_ptr), FP_OFF(my_bpb_ptr), bpb_start);
+
+    uint32_t sector_start = calculateLinearAddress(FP_SEG(&myDrive) , FP_OFF(&myDrive));
+    cdprintf("SD: myDrive = %4x:%4x %5X\n", FP_SEG(&myDrive), FP_OFF(&myDrive), sector_start);
+        
     cdprintf("SD: myDrive.sector = %4x:%4x\n", FP_SEG(myDrive.sectors), FP_OFF(myDrive.sectors));
-    cdprintf("SD: myDrive.sectors[16] = %4x:%4x\n", FP_SEG(&myDrive.sectors[16]), FP_OFF(&myDrive.sectors[16]));
-    uint32_t sector16 = ((uint32_t)FP_SEG(&myDrive.sectors[16]) << 4) + (uint32_t)FP_OFF(&myDrive.sectors[16]);
-    cdprintf("SD: myDrive.sectors[16] = %X\n", sector16);
-    uint32_t sector31 = ((uint32_t)FP_SEG(&myDrive.sectors[31]) << 4) + (uint32_t)FP_OFF(&myDrive.sectors[31]);
-    cdprintf("SD: myDrive.sectors[31] = %X\n", sector31);
+
+    uint32_t sector16 = calculateLinearAddress(FP_SEG(&myDrive.sectors[15]) , FP_OFF(&myDrive.sectors[15]));
+    cdprintf("SD: myDrive.sectors[15] = %4x:%4x %5X\n", FP_SEG(&myDrive.sectors[15]), FP_OFF(&myDrive.sectors[15]), sector16);
+
+    uint32_t sector31 = calculateLinearAddress(FP_SEG(&myDrive.sectors[31]) , FP_OFF(&myDrive.sectors[31]));
+
+    cdprintf("SD: myDrive.sectors[31] = %5X\n", sector31);
     cdprintf("SD: myDrive.sectors[31].data = %4x:%4x\n", FP_SEG(&myDrive.sectors[31].data), FP_OFF(&myDrive.sectors[31].data));
+
+    writeToDriveLog("SD: myDrive.sector = %4x:%4x sector = %5X myDrive.sectors[15] = %5X myDrive.sectors[31] = %5X my_bpb_ptr = %5X ",
+         FP_SEG(&myDrive.sectors), FP_OFF(&myDrive.sectors), sector_start, sector16, sector31, bpb_start);
     
     // /* All is well.  Tell DOS how many units and the BPBs... */
     cdprintf("SD: initialized on DOS drive %c r_firstunit: %d r_nunits: %d\n",(fpRequest->r_firstunit + 'A'), 
