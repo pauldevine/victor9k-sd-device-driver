@@ -35,7 +35,7 @@
 
 #include "cprint.h"     /* Console printing */
 
-#define LOG_SECTOR_START 16 // Start log file at the 16th sector
+#define LOG_SECTOR_START 15 // Start log file at the 16th sector
 #define BUFFER_SIZE ((NUM_SECTORS - LOG_SECTOR_START) * SECTOR_SIZE)
 
 extern MiniDrive  myDrive;
@@ -99,6 +99,11 @@ char* intToAscii(int32_t value, char *buffer, size_t bufferSize) {
     return p;
 }
 
+uint32_t calculateLinearAddress(uint16_t segment, uint16_t offset) {
+    return ((uint32_t)segment << 4) + offset;
+}
+
+
 void writeToDriveLog(const char* format, ...) {
     char buffer[SECTOR_SIZE];  // Temporary buffer for formatted string
     char *bufferPtr = buffer;
@@ -128,6 +133,13 @@ void writeToDriveLog(const char* format, ...) {
     const char *p = format;
     while (*p && remainingSize > 0) {
         if (*p == '%') {
+            int size = 4;
+            char nextChar = *(p + 1);
+            if ((nextChar >= '0')  &&  (nextChar <= '9')) {
+                size = nextChar - '0';  
+                remainingSize--;
+                p++;
+            }
             switch (*++p) {
                 case 'd': {
                     int16_t num = va_arg(args, int16_t);
@@ -149,7 +161,7 @@ void writeToDriveLog(const char* format, ...) {
                 }
                 case 'x': { // handle 16-bit hex number
                     uint16_t val = (uint16_t)va_arg(args, int); // Promoted to int, then cast to 16-bit
-                    for (int i = (sizeof(uint16_t) * 2) - 1; i >= 0; i--) {
+                    for (int i = size - 1; i >= 0; i--) {
                         uint8_t digit = (val >> (4 * i)) & 0xF;
                         if (digit > 9) *bufferPtr++ = 'A' + digit - 10;
                         else *bufferPtr++ = '0' + digit;
@@ -157,8 +169,11 @@ void writeToDriveLog(const char* format, ...) {
                     break;
                 }
                 case 'X': { // handle 32-bit hex number
+                    if (size == 4) {
+                        size = 8;
+                    }
                     uint32_t val = (uint32_t)va_arg(args, uint32_t);
-                    for (int i = (sizeof(uint32_t) * 2) - 1; i >= 0; i--) {
+                    for (int i = size - 1; i >= 0; i--) {
                         uint8_t digit = (val >> (4 * i)) & 0xF;
                         if (digit > 9) *bufferPtr++ = 'A' + digit - 10;
                         else *bufferPtr++ = '0' + digit;

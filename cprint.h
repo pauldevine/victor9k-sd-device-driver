@@ -62,6 +62,7 @@ void outdec (int val);
 void outhex (unsigned val, int ndigits);
 void outcrlf (void);
 char* intToAscii(int32_t value, char *buffer, size_t bufferSize);
+uint32_t calculateLinearAddress(uint16_t segment, uint16_t offset);
 void writeLog(Sector *sector, const char *format, ...);
 void writeToDriveLog(const char* format, ...);
 void strreverse(char* begin, char* end);
