@@ -140,7 +140,7 @@
  *      structures
  */
 
-#pragma pack(1)
+#pragma pack(push, 1)
 
 /* Device header */
 
@@ -385,35 +385,7 @@ typedef struct {
   uint8_t di_ioctl_status;   /* 0 if successful, 1 if error */
   uint8_t di_disk_type;       /* 0 = floppy. 1 = hard drive */
   uint8_t di_disk_location;   /* for floppy only 0 = left, 1 = right drive */
-} v9k_disk_info;
-
-/* 
-  READ or WRITE - ES:BX (Including IOCTL) ->
-  +-------------------------------------+
-  | 13-BYTE Request Header              |
-  +-----——-----—------------------------+
-  | BYTE media descriptor from DPB      |          
-  +-------------------------------------+
-  | DWORD transfer address              |
-  +-------------------------------------+
-  | WORD byte/sector count              |
-  +-------------------------------------+
-  | WORD starting sector number         |
-  | (Ignored on character devices)      |
-  +-------------------------------------+
-*/ 
-
-typedef struct {
-  uint8_t _r_meddesc;           /*  MEDIA Descriptor    */
-  uint8_t __far * _r_trans;     /*  Transfer Address    */
-  uint16_t _r_count;           /*  Byte/Sector Count   */
-  uint16_t _r_start;           /*  Starting Sector No. */
-} read_write;
-
-typedef struct {
-  uint8_t _r_media_desc;          /*  MEDIA Descriptor    */
-  uint8_t _r_ret_code;          /*  Return Code         */
-} media_check_data;
+} V9kDiskInfo;
 
 typedef boot super;             /* Alias for boot structure             */
 
@@ -423,28 +395,38 @@ typedef struct {
   uint8_t r_length;               /*  Request Header length               */
   uint8_t r_unit;                 /*  Unit Code                           */
   uint8_t r_command;              /*  Command Code                        */
-  uint16_t r_status;               /*  Status                              */
+  uint16_t r_status;              /*  Status                              */
   int8_t r_reserved[8];           /*  DOS Reserved Area                   */
   union {
     struct {
       uint8_t _r_nunits;          /*  number of units     */
-      int8_t __far *_r_endaddr;     /*  Ending Address      */
-      bpbtbl_t __far *_r_bpbptr;     /*  ptr to BPB array    */
+      int8_t __far *_r_endaddr;   /*  Ending Address      */
+      bpb *__far * _r_bpbptr;     /*  ptr to BPB array    */
       uint8_t _r_firstunit;
     } _r_init;
-    media_check_data __far * _r_media_ptr;         /* pointer to media_check struct */
+    struct {
+      int8_t _r_media_desc;       /*  MEDIA Descriptor    */
+      int8_t _r_ret_code;         /*  Return Code         */
+      int8_t __far * _r_vid;      /*  volume id */
+    } _r_media;
     struct {
       int8_t _r_meddesc;          /*  MEDIA Descriptor    */
       boot __far * _r_fat;        /*  boot sector pointer */
       bpb __far * _r_bpbpt;       /*  ptr to BPB table    */
     } _r_bpb;
-    read_write __far * _r_rw_ptr;           /* pointer to read_write struct */
+    struct {
+      int8_t _r_media_desc;       /*  MEDIA Descriptor    */
+      int8_t __far * _r_trans;    /*  Transfer Address    */
+      uint16_t _r_count;          /*  Byte/Sector Count   */
+      uint16_t _r_start;          /*  Starting Sector No. */
+      int8_t __far * _r_vid;      /*  Pointer to volume id */
+    } _r_rw;
     struct {
       unsigned char _r_ndbyte;  /*  Byte Read From Device       */
     } _r_nd;
     struct {
-      uint8_t _r_cat;              /* Category code */
-      uint8_t _r_fun;              /* Function code */
+      uint8_t _r_cat;             /* Category code */
+      uint8_t _r_fun;             /* Function code */
       uint16_t _r_si;              /* Contents of SI and DI */
       uint16_t _r_di;              /* (PC DOS 7 Technical Update, pp 104,105) */
       union
@@ -455,9 +437,8 @@ typedef struct {
         struct Gioc_media __far *_r_gioc;
         struct Access_info __far *_r_ai;
         void __far *_r_data;
-      } _r_par;                   /* Pointer to param. block from 440C/440D */
+      } _r_par;                 /* Pointer to param. block from 440C/440D */
     } _r_gen;
-    v9k_disk_info __far *_r_v9k_disk_info_ptr;       /*  ptr to v9k_disk_info    */
   } _r_x;
 } request;
 
@@ -475,9 +456,9 @@ typedef struct {
 #define r_firstunit     _r_x._r_init._r_firstunit
 
 /* MEDIA Check packet macros                                            */
-#define r_media_check   _r_x._r_media_ptr
-#define r_mc_media_desc _r_x._r_media_ptr->_r_media_desc
-#define r_mc_ret_code   _r_x._r_media_ptr->_r_ret_code
+#define r_media_check   _r_x._r_media
+#define r_mc_media_desc _r_x._r_media._r_media_desc
+#define r_mc_ret_code   _r_x._r_media._r_ret_code
 
 /* Build BPB packet macros                                              */
 #define r_bpmdesc       _r_x._r_bpb._r_meddesc
@@ -485,11 +466,11 @@ typedef struct {
 #define r_bpptr         _r_x._r_bpb._r_bpbpt
 
 /* rw packet macros                                                     */
-#define r_rw_ptr        _r_x._r_rw_ptr
-#define r_meddesc       _r_x._r_rw_ptr->_r_meddesc
-#define r_trans         _r_x._r_rw_ptr->_r_trans
-#define r_count         _r_x._r_rw_ptr->_r_count
-#define r_start         _r_x._r_rw_ptr->_r_start
+#define r_rw_ptr        _r_x._r_rw
+#define r_meddesc       _r_x._r_rw._r_media_desc
+#define r_trans         _r_x._r_rw._r_trans
+#define r_count         _r_x._r_rw._r_count
+#define r_start         _r_x._r_rw._r_start
 
 /* ndread packet macros                                                 */
 #define r_ndbyte        _r_x._r_nd._r_ndbyte
@@ -505,14 +486,6 @@ typedef struct {
 #define r_gioc          _r_x._r_gen._r_par._r_gioc
 #define r_ai            _r_x._r_gen._r_par._r_ai
 #define r_data          _r_x._r_gen._r_par._r_data
-
-
-/* Build Victor 9k IOCTL macros                                         */
-#define r_v9k_disk_info_ptr _r_x._r_v9k_disk_info_ptr        
-#define r_di_ioctl_type _r_x._r_v9k_disk_info_ptr->di_ioctl_type
-#define r_di_ioctl_status _r_x._r_v9k_disk_info_ptr->di_ioctl_status
-#define r_di_disk_type _r_x._r_v9k_disk_info_ptr->di_disk_type
-#define r_di_disk_location _r_x._r_v9k_disk_info_ptr->di_disk_location
 
 
 /*
