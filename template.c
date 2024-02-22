@@ -74,7 +74,7 @@ static uint16_t mediaCheck (void)
   //fpRequest->r_mediaCheck = MK_FP(registers.es, registers.bx);
   //cdprintf("SD: mediaCheck: unit=%x\n", fpRequest->r_mc_vol_id);
   
-  writeToDriveLog("SD: mediaCheck(): r_unit 0x%xh media_descriptor = 0x%xh r_mc_red_code: %d fpRequest: %x:%x\n", 
+  writeToDriveLog("SD: mediaCheck(): r_unit 0x%2xh media_descriptor = 0x%2xh r_mc_red_code: %d fpRequest: %x:%x\n", 
     fpRequest->r_unit, fpRequest->r_mc_media_desc, M_NOT_CHANGED,
     FP_SEG(fpRequest), FP_OFF(fpRequest));
  
@@ -93,23 +93,31 @@ static uint16_t buildBpb (void)
   // cdprintf("SD: buildBpb()\n");
   // if (debug)
   //     cdprintf("SD: buildBpb: unit=%x\n", fpRequest->r_bpmdesc);
-  writeToDriveLog("SD: buildBpb(): unit=0x%xh\n", fpRequest->r_bpmdesc);
-  //we build the BPB during the deviceInit() method.
+  uint32_t bpb_start = calculateLinearAddress(FP_SEG(fpRequest->r_bpptr) , FP_OFF(fpRequest->r_bpptr));
+    
+  writeToDriveLog("SD: buildBpb(): media_descriptor=0x%2xh r_bpfat: %x:%x r_bpptr: %x:%x %5X", 
+      fpRequest->r_bpmdesc, FP_SEG(fpRequest->r_bpfat), FP_OFF(fpRequest->r_bpfat),
+      FP_SEG(fpRequest->r_bpptr), FP_OFF(fpRequest->r_bpptr), bpb_start);
+  //we build the BPB during the deviceInit() method. just return pointer to built table
+  fpRequest->r_bpptr = my_bpb_ptr;
+
+
   return S_DONE;
 }
 
 static uint16_t IOCTLInput(void)
 {
-    //struct ALL_REGS registers;
-    bool failed, hard_disk, left;
-    //get_all_registers(&registers);
-    //cdprintf("SD: IOCTLInput()\n");
-    //fpRequest->r_v9k_disk_info_ptr = MK_FP(registers.ds, registers.dx);
+    struct ALL_REGS regs;
+    
+    get_all_registers(&regs);
+
+    //for the Victor disk IOCTL the datastructure is passed on thd DS:DX registers
+    V9kDiskInfo far *v9k_disk_info_ptr = MK_FP(regs.ds, regs.dx);
 
     //cdprintf("SD: IOCTLInput()");
-    writeToDriveLog("SD: IOCTLInput(): r_di_ioctl_type = 0x%xh\n", fpRequest->r_di_ioctl_type);
+    writeToDriveLog("SD: IOCTLInput(): di_ioctl_type = 0x%xh\n", v9k_disk_info_ptr->di_ioctl_type);
     {
-        switch (fpRequest->r_di_ioctl_type)
+        switch (v9k_disk_info_ptr->di_ioctl_type)
         {
         case GET_DISK_DRIVE_PHYSICAL_INFO:
             // cdprintf("SD: IOCTLInput() - GET_DISK_DRIVE_PHYSICAL_INFO");
@@ -119,13 +127,14 @@ static uint16_t IOCTLInput(void)
             // cdprintf("SD: IOCTLInput() -CX — length in bytes of this request structure (6) %x", registers.cx);
             // cdprintf("SD: IOCTLInput() -DS:DX — pointer to data structure %x:%x", registers.ds, registers.dx);
 
-            fpRequest->r_di_ioctl_type = GET_DISK_DRIVE_PHYSICAL_INFO;
-            failed = false;         /* 0 = success, 1 = failure */
+            v9k_disk_info_ptr->di_ioctl_type = GET_DISK_DRIVE_PHYSICAL_INFO;
+            bool failed, hard_disk, left;
+            failed = false;         /* 0 = success, 1 = failure, so when failed=false that means success=true */
             hard_disk = true;
             left = false;
-            fpRequest->r_di_ioctl_status = failed;
-            fpRequest->r_di_disk_type = hard_disk;
-            fpRequest->r_di_disk_location = left;
+            v9k_disk_info_ptr->di_ioctl_status = failed;
+            v9k_disk_info_ptr->di_disk_type = hard_disk;
+            v9k_disk_info_ptr->di_disk_location = left;
 
             //cdprintf("SD: IOCTLInput() - GET_DISK_DRIVE_PHYSICAL_INFO - success: %d", success);
 
@@ -134,7 +143,7 @@ static uint16_t IOCTLInput(void)
 
         default:
             failed = true;
-            fpRequest->r_di_ioctl_status = failed;
+            v9k_disk_info_ptr->di_ioctl_status = failed;
             return (S_DONE | S_ERROR | E_UNKNOWN_COMMAND);
             break;
         }
@@ -179,7 +188,7 @@ static uint16_t readBlock (void)
 {
   // cdprintf("SD: readBlock()\n");
   if (debug) {
-    writeToDriveLog("SD: read block: media_descriptor=%d, start=%d, count=%d, r_trans=%x:%x\n",
+    writeToDriveLog("SD: read block: media_descriptor=0x%2xh, start=%d, count=%d, r_trans=%x:%x\n",
      fpRequest->r_meddesc, fpRequest->r_start, fpRequest->r_count, 
              FP_SEG(fpRequest->r_trans), FP_OFF(fpRequest->r_trans));
   }
@@ -299,8 +308,8 @@ void __far DeviceInterrupt( void )
     }
     else
     {
-        writeToDriveLog("SD: DeviceInterrupt command: %d r_unit: %d isMyUnit(): %d r_status: %d r_length: %d initNeeded: %d\n",
-            fpRequest->r_command, fpRequest->r_unit, isMyUnit(fpRequest->r_unit), fpRequest->r_status, fpRequest->r_length, initNeeded);   
+        // writeToDriveLog("SD: DeviceInterrupt command: %d r_unit: 0x%2xh isMyUnit(): %d r_status: %d r_length: %d initNeeded: %d\n",
+        //     fpRequest->r_command, fpRequest->r_unit, isMyUnit(fpRequest->r_unit), fpRequest->r_status, fpRequest->r_length, initNeeded);   
         if ((initNeeded && fpRequest->r_command == C_INIT) || isMyUnit(fpRequest->r_unit)) {
             fpRequest->r_status = currentFunction();
         } else {
