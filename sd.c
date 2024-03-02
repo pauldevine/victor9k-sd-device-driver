@@ -82,6 +82,7 @@ uint32_t partition_offset = 0;
 
 
 uint8_t local_buffer[BLOCKSIZE];
+extern bool debug;
 
 #define LD_WORD(x) *((uint16_t *)(uint8_t *)(x))
 #define LD_DWORD(x) *((uint32_t *)(uint8_t *)(x))
@@ -123,17 +124,17 @@ int find_volume (uint8_t unit, uint8_t partno, bpb far *bpb)
 
    stat = disk_status(unit);
    if (!(stat & STA_NOINIT)) {      /* and the physical drive is kept initialized */
-      cdprintf ("find_volume: before disk_initialize() disk_status says stat: %x STA_NOINIT: %x\n", stat, STA_NOINIT);
+      if (debug) cdprintf ("find_volume: before disk_initialize() disk_status says stat: %x STA_NOINIT: %x\n", stat, STA_NOINIT);
          return 0;                  /* The file system object is valid */
    }
-   cdprintf ("find_volume: before disk_initialize() disk_status says stat: %x STA_NOINIT: %x\n", stat, STA_NOINIT);
+   if (debug) cdprintf ("find_volume: before disk_initialize() disk_status says stat: %x STA_NOINIT: %x\n", stat, STA_NOINIT);
 
    /* The file system object is not valid. */
    /* Following code attempts to mount the volume. (analyze BPB and initialize the fs object) */
 
    stat = disk_initialize(unit);    /* Initialize the physical drive */
    if (stat & STA_NOINIT) {          /* Check if the initialization succeeded */
-      cdprintf("find_volume: after disk_initialize() initialization failed no medium or hard error stat: %x STA_NOINIT: %x\n", stat, STA_NOINIT);
+      if (debug) cdprintf("find_volume: after disk_initialize() initialization failed no medium or hard error stat: %x STA_NOINIT: %x\n", stat, STA_NOINIT);
       return -1;                    /* Failed to initialize due to no medium or hard error */
    }
    cdprintf ("find_volume: after disk_initialize() disk_status says stat: %x STA_NOINIT: %x\n", stat, STA_NOINIT);
@@ -174,15 +175,15 @@ int find_volume (uint8_t unit, uint8_t partno, bpb far *bpb)
       bpb->bpb_nfat = 2;
    bpb->bpb_ndirent = LD_WORD(local_buffer+BPB_RootEntCnt);   
    bpb->bpb_nsize = LD_WORD(local_buffer+BPB_TotSec16);
-   if (!bpb->bpb_nsize) 
-      bpb->bpb_huge = LD_DWORD(local_buffer+BPB_TotSec32);
-   else
-      bpb->bpb_huge = bpb->bpb_nsize;
+   // if (!bpb->bpb_nsize) 
+   //    bpb->bpb_huge = LD_DWORD(local_buffer+BPB_TotSec32);
+   // else
+      // bpb->bpb_huge = bpb->bpb_nsize;
    bpb->bpb_mdesc = local_buffer[BPB_Media];
    bpb->bpb_nfsect = LD_WORD(local_buffer+BPB_FATSz16);             /* Number of sectors per FAT */
-   bpb->bpb_nsecs = LD_WORD(local_buffer+BPB_SecPerTrk);     /* Number of sectors per track */
-   bpb->bpb_nheads = LD_WORD(local_buffer+BPB_NumHeads);     /* Number of heads */
-   bpb->bpb_hidden = 1;
+   // bpb->bpb_nsecs = LD_WORD(local_buffer+BPB_SecPerTrk);     /* Number of sectors per track */
+   // bpb->bpb_nheads = LD_WORD(local_buffer+BPB_NumHeads);     /* Number of heads */
+   // bpb->bpb_hidden = 1;
 
    partition_offset = bsect;
    return 0;

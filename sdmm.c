@@ -90,8 +90,9 @@ static volatile V9kParallelPort far *via2 = MK_FP(PHASE2_DEVICE_SEGMENT,
 #define CS_INIT()
 
 static bool via_initialized;
-extern bool init_needed;
-const int bit_delay_us = 175;
+extern bool initNeeded;
+extern bool debug;
+const int bit_delay_us = 5;
 
 
 #define BITDLY() delay_us(bit_delay_us)
@@ -129,18 +130,18 @@ void outportbyte(volatile uint8_t far* port, uint8_t value) {
          //cdprintf("outportbyte: VIA NOT INITIALIZED, calling par_port_init()\n");
          par_port_init();
     }
-    Disable();  /* Disable interrupts */
+    //Disable();  /* Disable interrupts */
     via1->out_in_reg_a = value;
-    Enable();   /* Enable interrupts */
+    //Enable();   /* Enable interrupts */
     //*port = value;
     return;
 }
 
 uint8_t inportbyte(volatile uint8_t far* port) { 
    uint8_t data;
-   Disable();  /* Disable interrupts */
+   //Disable();  /* Disable interrupts */
    data = via1->out_in_reg_b;
-   Enable();   /* Enable interrupts */
+   //Enable();   /* Enable interrupts */
    //cdprintf("inportbyte: data: %x\n", data);
    return data;
 }
@@ -184,9 +185,9 @@ void par_port_init(void) {
    STATUSPORT=&via1->out_in_reg_b;
    CONTROLPORT=&via1->out_in_reg_b;
    via_initialized = true;
-   init_needed = false;
+   initNeeded = false;
 
-   cdprintf("Finished via_initialized, cycling bits\n");
+   if (debug) { cdprintf("Finished via_initialized, cycling bits\n"); }
    //say hello
    BITDLY(); 
    outportbyte(OUTPORT,0xFF);
@@ -746,14 +747,16 @@ DSTATUS disk_initialize (uint8_t drv)
    uint16_t tmr;
    DSTATUS s;
 
-   cdprintf ("disk_initialize: before setportbase(), drv: %x\n", drv);
-   cdprintf ("disk_initialize: before setportbase(), portbase: %x\n", portbase);
+   if (debug) {
+      cdprintf ("disk_initialize: before setportbase(), drv: %x\n", drv);
+      cdprintf ("disk_initialize: before setportbase(), portbase: %x\n", portbase);
+   }
    setportbase(portbase);
 
-   cdprintf ("disk_initialize: if (drv) return: %x\n", drv);
+   if (debug) cdprintf ("disk_initialize: if (drv) return: %x\n", drv);
    if (drv) return RES_NOTRDY;
    
-   cdprintf ("disk_initialize: if sd_card_check: %x CDDETECT(STATUSPORT): %x \n", 
+   if (debug) cdprintf ("disk_initialize: if sd_card_check: %x CDDETECT(STATUSPORT): %x \n", 
       sd_card_check, CDDETECT(STATUSPORT));
    if ((sd_card_check) && (CDDETECT(STATUSPORT))){
       return RES_NOTRDY;
@@ -761,7 +764,7 @@ DSTATUS disk_initialize (uint8_t drv)
    
    card_type = 0;
    for (n = 5; n; n--) {
-      cdprintf ("disk_initialize: for: %x\n", n);
+      if (debug) cdprintf ("disk_initialize: for: %x\n", n);
       CS_INIT(); 
       CS_H(OUTPORT);   /* Initialize port pin tied to CS */
       delay_us(10000);       /* 10ms. time for SD card to power up */
@@ -802,10 +805,10 @@ DSTATUS disk_initialize (uint8_t drv)
       }
    }
    CardType = card_type;
-   cdprintf ("disk_initialize: CardType: %x\n", CardType);
+   if (debug) cdprintf ("disk_initialize: CardType: %x\n", CardType);
    s = card_type ? 0 : STA_NOINIT;
    Stat = s;
-   cdprintf ("disk_initialize: Stat: %x\n", Stat);
+   if (debug) cdprintf ("disk_initialize: Stat: %x\n", Stat);
    deselect();
 
    return s;

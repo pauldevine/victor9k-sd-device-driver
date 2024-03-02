@@ -28,11 +28,231 @@
 
 #include <stdio.h>      /* NULL, etc...            */
 #include <stdint.h>
+#include <stdbool.h>
 #include <dos.h>        /* used only for MK_FP !      */
 #include <stdarg.h>     /* needed for variable argument lists  */
+#include <string.h>
 
 #include "cprint.h"     /* Console printing */
 
+#define LOG_SECTOR_START 15 // Start log file at the 16th sector
+#define SECTOR_SIZE 512
+#define NUM_SECTORS 32
+#define BUFFER_SIZE ((NUM_SECTORS - LOG_SECTOR_START) * SECTOR_SIZE)
+
+static size_t head = 0;  
+static size_t tail = BUFFER_SIZE - 1; // Points to the end of the logBuffer
+char logBuffer[SECTOR_SIZE] = {0};
+extern bool debug;
+
+void writeBuffer(char *data) {  
+   
+    int i = 0;
+    while(data[i] != '\0') {
+        logBuffer[head] = data[i];
+        head = (head + 1) % BUFFER_SIZE;
+        if (head == tail) {
+            head = 0; // Overwrite old data
+        }
+        i++;
+    }
+}
+
+void readBuffer(char *output, int maxSize) {
+    int i = 0;
+    while (tail != head && i < maxSize - 1) {
+        output[i] = logBuffer[tail];
+        tail = (tail + 1) % BUFFER_SIZE;
+        i++;
+    }
+    output[i] = '\0';
+}
+
+char* intToAscii(int32_t value, char *buffer, size_t bufferSize) {
+    if (bufferSize == 0) return NULL;   // Safety check
+    char* p = buffer + bufferSize - 1;  // Start at the end of the buffer
+    *p = '\0';  // Null-terminate the string
+
+    // Handle zero explicitly, since the loop below won't handle it
+    if (value == 0) {
+        *--p = '0';
+    }
+
+    // Handle negative numbers
+    bool isNegative = false;
+    if (value < 0) {
+        isNegative = true;
+        value = -value;  // Make the value positive for processing
+    }
+
+    // Convert the number to ASCII
+    while (value != 0) {
+        *--p = '0' + (value % 10);
+        value /= 10;
+    }
+
+    // Add minus sign for negative numbers
+    if (isNegative) {
+        *--p = '-';
+    }
+
+    // Return a pointer to the start of the ASCII representation
+    return p;
+}
+
+uint32_t calculateLinearAddress(uint16_t segment, uint16_t offset) {
+    return ((uint32_t)segment << 4) + offset;
+}
+
+
+void writeToDriveLog(const char* format, ...) {
+    char buffer[SECTOR_SIZE];  // Temporary buffer for formatted string
+    char *bufferPtr = buffer;
+    uint16_t remainingSize = SECTOR_SIZE;  // Remaining space in the buffer
+    static uint8_t logNum = 0;  // Log number
+    logNum++;
+
+    //insert some spacers just to help readability of log
+    uint8_t delimeter = 2;
+    for (uint8_t i =0; i<delimeter; i++) {
+        *bufferPtr++ = ' '; 
+        remainingSize--;    
+    }
+    
+    char logNumStr[12];  // Enough for 32-bit int, sign, and null terminator
+    char *logStr = intToAscii(logNum, (char *)logNumStr, sizeof(logNumStr));
+    while (*logStr && remainingSize > 0) {
+        *bufferPtr++ = *logStr++;
+        remainingSize--;
+    }
+    *bufferPtr++ = '|';
+    remainingSize--;
+    
+    va_list args;
+    va_start(args, format);
+
+    const char *p = format;
+    while (*p && remainingSize > 0) {
+        if (*p == '%') {
+            int size = 4;
+            char nextChar = *(p + 1);
+            if ((nextChar >= '0')  &&  (nextChar <= '9')) {
+                size = nextChar - '0';  
+                remainingSize--;
+                p++;
+            }
+            switch (*++p) {
+                case 'd': {
+                    int16_t num = va_arg(args, int16_t);
+                    char numStr[12];  // Enough for 32-bit int, sign, and null terminator
+                    char *str = intToAscii(num, (char *)numStr, sizeof(numStr));
+                    while (*str && remainingSize > 0) {
+                        *bufferPtr++ = *str++;
+                        remainingSize--;
+                    }
+                    break;
+                }
+                case 's': {
+                    char *str = va_arg(args, char*);
+                    while (*str && remainingSize > 0) {
+                        *bufferPtr++ = *str++;
+                        remainingSize--;
+                    }
+                    break;
+                }
+                case 'x': { // handle 16-bit hex number
+                    uint16_t val = (uint16_t)va_arg(args, int); // Promoted to int, then cast to 16-bit
+                    for (int i = size - 1; i >= 0; i--) {
+                        uint8_t digit = (val >> (4 * i)) & 0xF;
+                        if (digit > 9) *bufferPtr++ = 'A' + digit - 10;
+                        else *bufferPtr++ = '0' + digit;
+                    }
+                    break;
+                }
+                case 'X': { // handle 32-bit hex number
+                    if (size == 4) {
+                        size = 8;
+                    }
+                    uint32_t val = (uint32_t)va_arg(args, uint32_t);
+                    for (int i = size - 1; i >= 0; i--) {
+                        uint8_t digit = (val >> (4 * i)) & 0xF;
+                        if (digit > 9) *bufferPtr++ = 'A' + digit - 10;
+                        else *bufferPtr++ = '0' + digit;
+                    }
+                    break;
+                }
+                case 'p': {
+                    // Retrieve the pointer once and extract segment and offset
+                    void far *ptr = va_arg(args, void*);
+                    uint16_t seg = FP_SEG(ptr);
+                    uint16_t off = FP_OFF(ptr);
+
+                    // Calculate linear address (segment*16 + offset)
+                    uint32_t linearAddr = ((uint32_t)seg << 4) + off;
+
+                    // Convert segment to hexadecimal
+                    for (int32_t i = (sizeof(uint16_t) * 2) - 1; i >= 0; i--) {
+                        uint16_t digit = (seg >> (4 * i)) & 0xF;
+                        *bufferPtr++ = digit > 9 ? 'A' + digit - 10 : '0' + digit;
+                    }
+                    *bufferPtr++ = ':';
+
+                    // Convert offset to hexadecimal
+                    for (int32_t i = (sizeof(uint16_t) * 2) - 1; i >= 0; i--) {
+                        uint16_t digit = (off >> (4 * i)) & 0xF;
+                        *bufferPtr++ = digit > 9 ? 'A' + digit - 10 : '0' + digit;
+                    }
+
+                    // Add space for readability
+                    *bufferPtr++ = ' ';
+                    *bufferPtr++ = '=';
+
+                    // Convert linear address to hexadecimal
+                    for (int32_t i = (sizeof(uint32_t) * 2) - 1; i >= 0; i--) {
+                        uint32_t digit = (linearAddr >> (4 * i)) & 0xF;
+                        *bufferPtr++ = digit > 9 ? 'A' + digit - 10 : '0' + digit;
+                    }
+                    break;
+                }
+                case 'L': {  // Custom specifier for int32_t
+                    int32_t longNum = va_arg(args, int32_t);
+                    char longNumStr[12];  // Enough for 32-bit int, sign, and null terminator
+                    char *str = intToAscii(longNum, longNumStr, sizeof(longNumStr));
+                    while (*str && remainingSize > 0) {
+                        *bufferPtr++ = *str++;
+                        remainingSize--;
+                    }
+                    break;
+                }
+                // Add other format specifiers as needed
+                default:
+                    if (remainingSize > 1) {
+                        *bufferPtr++ = '%';
+                        *bufferPtr++ = *p;
+                        remainingSize -= 2;
+                    }
+                    break;
+            }
+        } else {
+            *bufferPtr++ = *p;
+            remainingSize--;
+        }
+        p++;
+    }
+
+    *bufferPtr = '\0'; // Null-terminate the buffer
+    va_end(args);
+
+    size_t messageLen = bufferPtr - buffer;
+
+
+    // Write the formatted message to the current position
+    if (debug) {
+        //writeBuffer(buffer);
+        cdprintf(buffer);
+    }
+    
+}
 
 void set_crtc_reg(char reg, char value) {
     static volatile char far *crtc_addr_reg = MK_FP(PHASE2_DEVICE_SEGMENT, 
@@ -160,14 +380,21 @@ void outhex (unsigned val, int ndigits)
     outchr('0'+val);
 }
 
-/* outhex - print a n digit hex number with leading zeros */
-void outlhex (uint16_t lval)
+/* outhex16 - print a 4 digit hex number with leading zeros */
+void outhex16 (uint16_t lval)
 {
   int i;
-  for (i=3;i>=0;i--)
+  for (i=1;i>=0;i--)
      outhex(((unsigned char *)&lval)[i],2);
 }
 
+/* outhex32 - print a 8 digit hex number with leading zeros */
+void outhex32 (uint32_t ulval)
+{
+  int i;
+  for (i=3;i>=0;i--)
+     outhex(((unsigned char *)&ulval)[i],2);
+}
 
 /* outcrlf - print a carriage return, line feed pair */
 void outcrlf (void)
@@ -201,9 +428,14 @@ void cdprintln(const char* str) {
 /* using the "safe" console output routines.  Only a few escape seq- */
 /* uences are allowed: %d, %x and %s.  A width modifier (e.g. %2x) is   */
 /* recognized only for %x, and then may only be a single decimal digit. */
-void cdprintf (char near *msg, ...)
+void cdprintf (char *msg, ...)
 {
-  va_list ap;  char *str;  int size, ival;  unsigned uval; uint16_t luval;
+  va_list ap;  
+  char *str;  
+  int size, ival;  
+  unsigned uval; 
+  uint16_t luval;
+  uint32_t ulval;
   va_start (ap, msg);
 
   while (*msg != '\0') {
@@ -231,18 +463,23 @@ void cdprintf (char near *msg, ...)
         uval = va_arg(ap, unsigned); 
         ++msg;
         outhex (uval,  (size > 0) ? size : 4);
+      } else if (*msg == 'X')
+      { // handle 32-bit hex number
+        ulval = va_arg(ap, uint32_t);
+        ++msg;
+        outhex32 (ulval);
       } else if (*msg == 'L') 
       {
         luval = va_arg(ap, uint16_t); 
         ++msg;
-        outlhex (luval);
+        outhex16 (luval);
       } else if (*msg == 's') {
         str = va_arg(ap, char *);  
         outstr (str);  
         ++msg;
       }
     } else if (*msg == '\n') {
-      newline(0xC80);  
+      newline();  
       ++msg;
     } else {
       outchr(*msg);  

@@ -25,6 +25,7 @@
 #include <stdint.h>
 
 #include "device.h"
+#pragma pack(1)
 
 #if ( _M_IX86 >= 0x200 )
 #define push_all "pusha"
@@ -52,16 +53,17 @@ struct ALL_REGS {
 #ifdef USE_INTERNAL_STACK
 
 #ifndef STACK_SIZE
-#define STACK_SIZE 300
+#define STACK_SIZE 4096
 #endif
 
 
 extern uint8_t *stack_bottom;
 extern uint32_t dos_stack;
-extern bool debug, init_needed;
+extern bool debug, initNeeded;
 extern int8_t my_units[9];
 extern request __far *fpRequest;
 extern struct device_header far *dev_header;
+
 
 extern void switch_stack( void );
 #pragma aux switch_stack = \
@@ -150,6 +152,9 @@ extern void Enable( void );
     parm [] \
     modify [];
 
+
 typedef uint16_t (*driverFunction_t)(void);
+
+#pragma pack( pop )
 
 #endif /* _TEMPLATE_H_ */
