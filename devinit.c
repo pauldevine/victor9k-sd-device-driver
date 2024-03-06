@@ -60,7 +60,7 @@
 #pragma data_seg("_CODE")
 bool debug = FALSE;
 static uint8_t portbase;
-static uint8_t partition_number;
+static uint8_t partition_number = 0;
 //
 // Place here any variables or constants that should go away after initialization
 //
@@ -106,9 +106,9 @@ uint16_t deviceInit( void )
     fpRequest->r_endaddr = MK_FP(registers.cs, &transient_data);
     struct device_header far *dev_header = MK_FP(registers.cs, 0);
 
-    printMsg("\r\nSD pport device driver v0.1 (C) 2023 by Paul Devine\r\n");
-    printMsg("     based on (C) 2014 by Dan Marks and on TU58 by Robert Armstrong\r\n");
-    printMsg("     with help from an openwatcom driver by Eduardo Casino\r\n");
+    cdprintf("\nSD pport device driver v0.1 (C) 2023 by Paul Devine\n");
+    cdprintf("     based on (C) 2014 by Dan Marks and on TU58 by Robert Armstrong\n");
+    cdprintf("     with help from an openwatcom driver by Eduardo Casino\n");
 
 
     //address to find passed by DOS in a combo of ES / BX get_all_registers
@@ -146,7 +146,8 @@ uint16_t deviceInit( void )
     if (debug) cdprintf("done parsing bpb_ptr: %x\n", bpb_ptr);
 
     /* Try to make contact with the drive... */
-    if (debug) cdprintf("SD: initializing drive\n");
+    if (debug) cdprintf("SD: initializing drive r_unit: %d, partition_number: %d, my_bpb_ptr: %X\n", 
+        fpRequest->r_unit, partition_number, my_bpb_ptr);
     if (!sd_initialize(fpRequest->r_unit, partition_number, my_bpb_ptr))    {
         cdprintf("SD: drive not connected or not powered\n");
         printMsg(hellomsg);
@@ -156,7 +157,7 @@ uint16_t deviceInit( void )
     //setting unit count to 1 to make DOS happy
     dev_header->dh_num_drives = 1;
     fpRequest->r_nunits = 1;         //tell DOS how many drives we're instantiating.
-    *(my_bpbtbl_ptr)[0] = my_bpb_ptr;
+    *(my_bpbtbl_ptr)[fpRequest->r_unit] = my_bpb_ptr;
     fpRequest->r_bpbptr = my_bpbtbl_ptr;
     bpb_ptr = my_bpb_ptr;
 
@@ -265,10 +266,10 @@ bool parse_options (char far *p)
     case 'P':
         if ((p=option_value(p,&temp)) == FALSE)  return FALSE;
         if ((temp < 1) || (temp > 4))
-            if (debug) cdprintf("SD: Invalid partition number %x\n",temp);
+            cdprintf("SD: Invalid partition number %d\n",temp);
         else
             partition_number = temp;
-            if (debug) cdprintf("SD: partition_number: %x\n", temp);
+            cdprintf("SD: partition number: %d\n", partition_number);
         break; 
     case 'b': 
     case 'B':

@@ -93,7 +93,7 @@ extern bool debug;
 
 static
 uint8_t check_fs (uint8_t unit,  
-   /* 0:FAT boor sector, 1:Valid boor sector but not FAT, */
+   /* 0:FAT boor sector, 1:Valid boot sector but not FAT, */
    /* 2:Not a boot sector, 3:Disk error */
    uint32_t sect  /* Sector# (lba) to check if it is an FAT boot record or not */
 )
@@ -122,6 +122,7 @@ int find_volume (uint8_t unit, uint8_t partno, bpb far *bpb)
    uint16_t secsize;
    uint32_t bsect;
 
+   if (debug) cdprintf ("find_volume: start unit: %d partno: %d bpbptr: %X\n", fmt, partno, bpb);
    stat = disk_status(unit);
    if (!(stat & STA_NOINIT)) {      /* and the physical drive is kept initialized */
       if (debug) cdprintf ("find_volume: before disk_initialize() disk_status says stat: %x STA_NOINIT: %x\n", stat, STA_NOINIT);
@@ -137,7 +138,7 @@ int find_volume (uint8_t unit, uint8_t partno, bpb far *bpb)
       if (debug) cdprintf("find_volume: after disk_initialize() initialization failed no medium or hard error stat: %x STA_NOINIT: %x\n", stat, STA_NOINIT);
       return -1;                    /* Failed to initialize due to no medium or hard error */
    }
-   cdprintf ("find_volume: after disk_initialize() disk_status says stat: %x STA_NOINIT: %x\n", stat, STA_NOINIT);
+   if (debug) cdprintf ("find_volume: after disk_initialize() disk_status says stat: %x STA_NOINIT: %x\n", stat, STA_NOINIT);
    
    /* Find an FAT partition on the drive. Supports only generic partitioning, FDISK and SFD. */
    bsect = 0;
@@ -157,6 +158,7 @@ int find_volume (uint8_t unit, uint8_t partno, bpb far *bpb)
          fmt = bsect ? check_fs(unit, bsect) : 2; /* Check the partition */
       } while (!partno && fmt && ++i < 4);
    }
+   if (debug) cdprintf ("find_volume: after check_fs fmt: %d partno: %d bsect: %X\n", fmt, partno, bsect);
    if (fmt == 3) return -2;      /* An error occured in the disk I/O layer */
    if (fmt) return -3;           /* No FAT volume is found */
 
@@ -186,6 +188,8 @@ int find_volume (uint8_t unit, uint8_t partno, bpb far *bpb)
    // bpb->bpb_hidden = 1;
 
    partition_offset = bsect;
+   if (debug) cdprintf ("find_volume: partition: %d partition_offset: %X\n", partno, partition_offset);
+   
    return 0;
 }
 

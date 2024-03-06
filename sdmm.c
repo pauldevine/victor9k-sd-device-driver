@@ -92,7 +92,7 @@ static volatile V9kParallelPort far *via2 = MK_FP(PHASE2_DEVICE_SEGMENT,
 static bool via_initialized;
 extern bool initNeeded;
 extern bool debug;
-const int bit_delay_us = 5;
+const int bit_delay_us = 2;
 
 
 #define BITDLY() delay_us(bit_delay_us)
